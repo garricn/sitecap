@@ -67,6 +67,8 @@ const { values, positionals } = parseArgs({
     "max-pages": { type: "string", default: "50" },
     filter: { type: "string" },
     exclude: { type: "string" },
+    auth: { type: "string" },
+    video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -91,6 +93,8 @@ Options:
   --max-pages <n>          Max pages to crawl (default: 50)
   --filter <regex>         Only crawl URLs matching pattern
   --exclude <regex>        Skip URLs matching pattern
+  --auth <file>            Load cookies/storage from JSON before capture
+  --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -181,6 +185,19 @@ try {
 
 const context = browser.contexts()[0] || await browser.newContext();
 
+// Load auth state (cookies/storage) if provided
+if (values.auth) {
+  const authData = JSON.parse(await readFile(resolve(values.auth), "utf-8"));
+  if (authData.cookies && authData.cookies.length > 0) {
+    await context.addCookies(authData.cookies);
+    console.log(`Loaded ${authData.cookies.length} cookies from ${values.auth}`);
+  }
+  if (authData.localStorage) {
+    // localStorage must be injected per-page after navigation, store for later
+    context.__sitecapLocalStorage = authData.localStorage;
+  }
+}
+
 // BFS crawl queue: { url, slug, depth }
 const queue = targets.map((t) => ({ ...t, depth: 0 }));
 const visited = new Set(targets.map((t) => normalizeUrl(t.url)));
@@ -190,8 +207,8 @@ let nextIndex = 0;
 let totalEnqueued = queue.length;
 
 async function worker() {
-  const page = await context.newPage();
-  await page.setViewportSize(viewport);
+  const page = values.video ? null : await context.newPage();
+  if (page) await page.setViewportSize(viewport);
 
   while (nextIndex < queue.length) {
     const idx = nextIndex++;
@@ -200,8 +217,25 @@ async function worker() {
     const label = crawl ? `[${idx + 1}/${totalEnqueued}+]` : `[${idx + 1}/${queue.length}]`;
     console.log(`${label} ${target.url}${crawl ? ` (depth ${target.depth})` : ""}`);
 
+    // For video: create a fresh context+page per URL so each gets its own recording
+    let activePage = page;
+    let videoCtx = null;
+    if (values.video) {
+      const { mkdir: mkdirSync } = await import("node:fs/promises");
+      await mkdirSync(pageDir, { recursive: true });
+      videoCtx = await browser.newContext({
+        viewport,
+        recordVideo: { dir: pageDir },
+      });
+      if (values.auth) {
+        const cookies = await context.cookies();
+        if (cookies.length > 0) await videoCtx.addCookies(cookies);
+      }
+      activePage = await videoCtx.newPage();
+    }
+
     try {
-      const meta = await navigateAndCapture(page, target.url, pageDir, {
+      const meta = await navigateAndCapture(activePage, target.url, pageDir, {
         types,
       });
 
@@ -214,7 +248,7 @@ async function worker() {
 
       // Crawl: extract links and enqueue new ones
       if (crawl && target.depth < maxDepth && totalEnqueued < maxPages) {
-        const links = await extractLinks(page);
+        const links = await extractLinks(activePage);
         for (const link of links) {
           if (totalEnqueued >= maxPages) break;
           const norm = normalizeUrl(link);
@@ -230,9 +264,26 @@ async function worker() {
       console.error(`  ✗ ${e.message}`);
       failed++;
     }
+
+    // Close video context per-page to finalize the recording
+    if (videoCtx) {
+      const videoPath = await activePage.video()?.path();
+      await activePage.close();
+      await videoCtx.close();
+      // Rename the video file to a consistent name
+      if (videoPath) {
+        const { rename } = await import("node:fs/promises");
+        const destPath = join(pageDir, "video.webm");
+        try {
+          await rename(videoPath, destPath);
+        } catch {
+          // video file may not exist if page failed
+        }
+      }
+    }
   }
 
-  await page.close();
+  if (page) await page.close();
 }
 
 // Launch workers up to concurrency limit (or target count if fewer)
