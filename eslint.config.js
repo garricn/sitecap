@@ -19,6 +19,7 @@ export default [
         localStorage: "readonly",
         sessionStorage: "readonly",
         document: "readonly",
+        performance: "readonly",
       },
     },
   },
