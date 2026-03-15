@@ -13,7 +13,7 @@ Capture a web page using sitecap — screenshot, accessibility tree, HTML, netwo
 When this skill is invoked, run sitecap to capture the specified URL:
 
 ```bash
-node /Users/garricn/Developer/sitecap/bin/sitecap.js <url> --launch -o /tmp/sitecap-capture
+npx sitecap <url> --launch -o /tmp/sitecap-capture
 ```
 
 After capture completes, read and summarize the key files:
