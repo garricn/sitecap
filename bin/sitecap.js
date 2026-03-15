@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
+import { createInterface } from "node:readline";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
@@ -78,6 +79,8 @@ const { values, positionals } = parseArgs({
     filter: { type: "string" },
     exclude: { type: "string" },
     auth: { type: "string" },
+    "wait-for-auth": { type: "boolean", default: false },
+    "auth-url": { type: "string" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -107,6 +110,8 @@ Options:
   --filter <regex>         Only crawl URLs matching pattern
   --exclude <regex>        Skip URLs matching pattern
   --auth <file>            Load cookies/storage from JSON before capture
+  --wait-for-auth          Launch Chrome, wait for user to log in, then capture
+  --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -128,6 +133,7 @@ Chrome setup:
 Examples:
   sitecap https://example.com --launch
   sitecap https://example.com --profile Default -o ./captures
+  sitecap -m manifest.json --profile Work --wait-for-auth --auth-url https://app.example.com/login
   sitecap https://example.com --crawl --max-depth 2 --max-pages 20 --launch
   sitecap https://example.com/a https://example.com/b -o ./captures -c 2
   sitecap -m manifest.json -o ./captures -t screenshot,accessibility
@@ -181,6 +187,12 @@ if (crawl) {
 }
 console.log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${concurrency}`);
 
+// Validate flag combinations
+if (values["wait-for-auth"] && !values.profile) {
+  console.error("--wait-for-auth requires --profile (need a visible browser to log in)");
+  process.exit(1);
+}
+
 // Connect or launch Chrome
 let browser;
 let profileContext = null;
@@ -203,6 +215,19 @@ if (values.profile) {
     process.exit(1);
   }
   console.log("Chrome launched with profile.");
+
+  // Wait for user to authenticate if requested
+  if (values["wait-for-auth"]) {
+    if (values["auth-url"]) {
+      const authPage = await profileContext.newPage();
+      await authPage.goto(values["auth-url"], { waitUntil: "domcontentloaded", timeout: 30_000 });
+      console.log(`Navigated to ${values["auth-url"]}`);
+    }
+    console.log("\nLog in, then press Enter to continue...");
+    const rl = createInterface({ input: process.stdin });
+    await new Promise((resolve) => rl.once("line", () => { rl.close(); resolve(); }));
+    console.log("Continuing with capture...");
+  }
 } else {
   try {
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
