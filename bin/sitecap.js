@@ -81,6 +81,7 @@ const { values, positionals } = parseArgs({
     auth: { type: "string" },
     "wait-for-auth": { type: "boolean", default: false },
     "auth-url": { type: "string" },
+    "auto-auth": { type: "string" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -112,6 +113,7 @@ Options:
   --auth <file>            Load cookies/storage from JSON before capture
   --wait-for-auth          Launch Chrome, wait for user to log in, then capture
   --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
+  --auto-auth <provider>   Automate OAuth login (e.g., google). Requires --profile
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -192,6 +194,10 @@ if (values["wait-for-auth"] && !values.profile) {
   console.error("--wait-for-auth requires --profile (need a visible browser to log in)");
   process.exit(1);
 }
+if (values["auto-auth"] && !values.profile) {
+  console.error("--auto-auth requires --profile (need a Chrome session with a logged-in account)");
+  process.exit(1);
+}
 
 // Connect or launch Chrome
 let browser;
@@ -260,6 +266,31 @@ if (values.auth) {
     // localStorage must be injected per-page after navigation, store for later
     context.__sitecapLocalStorage = authData.localStorage;
   }
+}
+
+// Auto-auth: navigate to first URL, perform OAuth, then proceed
+if (values["auto-auth"]) {
+  const { autoAuth } = await import("../lib/auth.js");
+  const authPage = await context.newPage();
+  await authPage.setViewportSize(viewport);
+  const authTarget = targets[0].url;
+  console.log(`Auto-auth (${values["auto-auth"]}): navigating to ${authTarget}...`);
+  await authPage.goto(authTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
+
+  const userDataDir = values["user-data-dir"] || findUserDataDir();
+  const profileDir = values.profile ? await resolveProfileDir(userDataDir, values.profile) : null;
+
+  const success = await autoAuth(values["auto-auth"], authPage, context, {
+    profileDir,
+    userDataDir,
+  });
+
+  if (success) {
+    console.log("Auto-auth succeeded.");
+  } else {
+    console.log("Auto-auth did not complete — proceeding without auth.");
+  }
+  await authPage.close();
 }
 
 // BFS crawl queue: { url, slug, depth }
