@@ -3,11 +3,19 @@
   "version": "0.1.0",
   "description": "Exhaustive web page capture — screenshot, accessibility tree, HTML source, network requests, console logs, storage state.",
   "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./capture": "./lib/capture.js",
+    "./diff": "./lib/diff.js"
+  },
   "bin": {
     "sitecap": "./bin/sitecap.js"
   },
   "scripts": {
     "start": "node bin/sitecap.js",
+    "mcp": "node bin/mcp-server.js",
+    "api": "node bin/api-server.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [
@@ -20,6 +28,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0"
