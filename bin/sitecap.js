@@ -49,7 +49,7 @@ Chrome setup:
 Examples:
   sitecap https://example.com
   sitecap https://example.com/a https://example.com/b -o ./captures
-  sitecap -m manifest.json -o ./ghl-export -t screenshot,accessibility
+  sitecap -m manifest.json -o ./captures -t screenshot,accessibility
 `);
   process.exit(0);
 }

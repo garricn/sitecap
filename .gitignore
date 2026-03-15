@@ -1,2 +1,25 @@
+# Dependencies
 node_modules/
+
+# Output
 output/
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+auth.json
+secrets.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
