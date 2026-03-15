@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import { readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
-import { navigateAndCapture } from "../lib/capture.js";
+import { navigateAndCapture, extractLinks } from "../lib/capture.js";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -16,6 +16,9 @@ const { values, positionals } = parseArgs({
     viewport: { type: "string", short: "v", default: "1280x720" },
     concurrency: { type: "string", short: "c", default: "4" },
     launch: { type: "boolean", default: false },
+    crawl: { type: "boolean", default: false },
+    "max-depth": { type: "string", default: "3" },
+    "max-pages": { type: "string", default: "50" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -35,6 +38,9 @@ Options:
   -v, --viewport <WxH>     Viewport size (default: 1280x720)
   -c, --concurrency <n>    Parallel tabs (default: 4)
   --launch                 Auto-launch headless Chrome if not running
+  --crawl                  Crawl same-origin links from captured pages
+  --max-depth <n>          Max crawl depth (default: 3)
+  --max-pages <n>          Max pages to crawl (default: 50)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -50,6 +56,7 @@ Chrome setup:
 
 Examples:
   sitecap https://example.com --launch
+  sitecap https://example.com --crawl --max-depth 2 --max-pages 20 --launch
   sitecap https://example.com/a https://example.com/b -o ./captures -c 2
   sitecap -m manifest.json -o ./captures -t screenshot,accessibility
 `);
@@ -60,6 +67,9 @@ const outDir = resolve(values.output);
 const port = parseInt(values.port, 10);
 const concurrency = Math.max(1, parseInt(values.concurrency, 10));
 const types = values.types ? values.types.split(",").map((s) => s.trim()) : undefined;
+const crawl = values.crawl;
+const maxDepth = parseInt(values["max-depth"], 10);
+const maxPages = parseInt(values["max-pages"], 10);
 
 // Parse viewport
 const viewportMatch = values.viewport.match(/^(\d+)x(\d+)$/);
@@ -90,7 +100,11 @@ if (targets.length === 0) {
   process.exit(1);
 }
 
-console.log(`sitecap: ${targets.length} page(s) → ${outDir}`);
+if (crawl) {
+  console.log(`sitecap: crawling from ${targets.length} seed(s) → ${outDir} (max-depth: ${maxDepth}, max-pages: ${maxPages})`);
+} else {
+  console.log(`sitecap: ${targets.length} page(s) → ${outDir}`);
+}
 console.log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${concurrency}`);
 
 // Connect or launch Chrome
@@ -115,20 +129,24 @@ try {
 
 const context = browser.contexts()[0] || await browser.newContext();
 
-// Worker pool for parallel capture
+// BFS crawl queue: { url, slug, depth }
+const queue = targets.map((t) => ({ ...t, depth: 0 }));
+const visited = new Set(targets.map((t) => normalizeUrl(t.url)));
 let captured = 0;
 let failed = 0;
 let nextIndex = 0;
+let totalEnqueued = queue.length;
 
 async function worker() {
   const page = await context.newPage();
   await page.setViewportSize(viewport);
 
-  while (nextIndex < targets.length) {
+  while (nextIndex < queue.length) {
     const idx = nextIndex++;
-    const target = targets[idx];
+    const target = queue[idx];
     const pageDir = join(outDir, target.slug);
-    console.log(`[${idx + 1}/${targets.length}] ${target.url}`);
+    const label = crawl ? `[${idx + 1}/${totalEnqueued}+]` : `[${idx + 1}/${queue.length}]`;
+    console.log(`${label} ${target.url}${crawl ? ` (depth ${target.depth})` : ""}`);
 
     try {
       const meta = await navigateAndCapture(page, target.url, pageDir, {
@@ -141,6 +159,19 @@ async function worker() {
         console.log(`  ✓ ${Object.keys(meta.captures).length} files`);
       }
       captured++;
+
+      // Crawl: extract links and enqueue new ones
+      if (crawl && target.depth < maxDepth && totalEnqueued < maxPages) {
+        const links = await extractLinks(page);
+        for (const link of links) {
+          if (totalEnqueued >= maxPages) break;
+          const norm = normalizeUrl(link);
+          if (visited.has(norm)) continue;
+          visited.add(norm);
+          queue.push({ url: link, slug: slugify(link), depth: target.depth + 1 });
+          totalEnqueued++;
+        }
+      }
     } catch (e) {
       console.error(`  ✗ ${e.message}`);
       failed++;
@@ -151,7 +182,7 @@ async function worker() {
 }
 
 // Launch workers up to concurrency limit (or target count if fewer)
-const workerCount = Math.min(concurrency, targets.length);
+const workerCount = Math.min(concurrency, queue.length);
 const workers = [];
 for (let i = 0; i < workerCount; i++) {
   workers.push(worker());
@@ -162,6 +193,17 @@ await browser.close();
 
 console.log(`\nDone: ${captured} captured, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);
+
+function normalizeUrl(url) {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    // Strip trailing slash for dedup
+    return u.href.replace(/\/+$/, "");
+  } catch {
+    return url;
+  }
+}
 
 function slugify(url) {
   try {

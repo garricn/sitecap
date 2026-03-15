@@ -73,7 +73,7 @@
                   "task": "Add --crawl flag with BFS link extraction from rendered DOM. --max-depth N, --max-pages N. Same-origin only",
                   "owner": "--",
                   "depends": ["CORE-2", "CORE-3"],
-                  "status": "pending",
+                  "status": "done",
                   "release": "v0.3.0"
                 }
               ]
