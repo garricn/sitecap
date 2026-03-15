@@ -181,6 +181,70 @@
           "release": "--"
         }
       ]
+    },
+    {
+      "name": "Auth",
+      "prefix": "AUTH",
+      "tasks": [
+        {
+          "id": "AUTH-1",
+          "task": "Add --wait-for-auth flag: launch Chrome headed with --profile, optionally navigate to --auth-url, wait for stdin Enter, then capture. Closes #11",
+          "owner": "--",
+          "depends": [],
+          "status": "done",
+          "release": "v0.6.0"
+        }
+      ]
+    },
+    {
+      "name": "Integration",
+      "prefix": "INT",
+      "waves": [
+        {
+          "id": "INT-W1",
+          "parallelism": "SRL",
+          "tasks": [
+            {
+              "id": "INT-1",
+              "task": "Library entry point — index.js exporting capturePage, navigateAndCapture, extractLinks, diffCaptures, waitForPageSettle",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "v0.6.0"
+            },
+            {
+              "id": "INT-2",
+              "task": "MCP server — expose sitecap as tools (capture, diff, crawl) for Claude Code and agent workflows",
+              "owner": "--",
+              "depends": ["INT-1"],
+              "status": "pending",
+              "release": "v0.6.0"
+            }
+          ]
+        },
+        {
+          "id": "INT-W2",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "INT-3",
+              "task": "REST API — HTTP server with POST /capture, POST /diff, POST /crawl endpoints for cross-language consumption",
+              "owner": "--",
+              "depends": ["INT-1"],
+              "status": "pending",
+              "release": "v0.7.0"
+            },
+            {
+              "id": "INT-4",
+              "task": "Skill.md — /capture slash command for Claude Code",
+              "owner": "--",
+              "depends": ["INT-1"],
+              "status": "pending",
+              "release": "v0.6.0"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
