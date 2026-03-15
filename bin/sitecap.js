@@ -12,8 +12,10 @@ const { values, positionals } = parseArgs({
     output: { type: "string", short: "o", default: "./output" },
     port: { type: "string", short: "p", default: "9222" },
     types: { type: "string", short: "t" },
-    wait: { type: "string", short: "w", default: "2000" },
     manifest: { type: "string", short: "m" },
+    viewport: { type: "string", short: "v", default: "1280x720" },
+    concurrency: { type: "string", short: "c", default: "4" },
+    launch: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -26,13 +28,15 @@ Usage:
   sitecap -m manifest.json [options]
 
 Options:
-  -o, --output <dir>      Output directory (default: ./output)
-  -p, --port <port>       Chrome DevTools port (default: 9222)
-  -t, --types <list>      Comma-separated capture types (default: all)
-                          Types: screenshot,accessibility,html,network,console,storage
-  -w, --wait <ms>         Extra wait after load (default: 2000)
-  -m, --manifest <file>   JSON manifest of URLs to capture
-  -h, --help              Show this help
+  -o, --output <dir>       Output directory (default: ./output)
+  -p, --port <port>        Chrome DevTools port (default: 9222)
+  -t, --types <list>       Comma-separated capture types (default: all)
+                           Types: screenshot,accessibility,html,network,console,storage
+  -v, --viewport <WxH>     Viewport size (default: 1280x720)
+  -c, --concurrency <n>    Parallel tabs (default: 4)
+  --launch                 Auto-launch headless Chrome if not running
+  -m, --manifest <file>    JSON manifest of URLs to capture
+  -h, --help               Show this help
 
 Manifest format:
   [
@@ -41,14 +45,12 @@ Manifest format:
   ]
 
 Chrome setup:
-  Launch Chrome with remote debugging enabled:
-    /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222
-
-  Or connect to an existing Chrome via chrome://inspect/#remote-debugging
+  Either use --launch to auto-start headless Chrome, or start Chrome manually:
+    google-chrome --remote-debugging-port=9222
 
 Examples:
-  sitecap https://example.com
-  sitecap https://example.com/a https://example.com/b -o ./captures
+  sitecap https://example.com --launch
+  sitecap https://example.com/a https://example.com/b -o ./captures -c 2
   sitecap -m manifest.json -o ./captures -t screenshot,accessibility
 `);
   process.exit(0);
@@ -56,8 +58,16 @@ Examples:
 
 const outDir = resolve(values.output);
 const port = parseInt(values.port, 10);
-const waitMs = parseInt(values.wait, 10);
+const concurrency = Math.max(1, parseInt(values.concurrency, 10));
 const types = values.types ? values.types.split(",").map((s) => s.trim()) : undefined;
+
+// Parse viewport
+const viewportMatch = values.viewport.match(/^(\d+)x(\d+)$/);
+if (!viewportMatch) {
+  console.error(`Invalid viewport format: ${values.viewport}. Use WxH (e.g., 1280x720)`);
+  process.exit(1);
+}
+const viewport = { width: parseInt(viewportMatch[1], 10), height: parseInt(viewportMatch[2], 10) };
 
 // Build URL list from positionals or manifest
 let targets = [];
@@ -81,52 +91,74 @@ if (targets.length === 0) {
 }
 
 console.log(`sitecap: ${targets.length} page(s) → ${outDir}`);
-console.log(`Connecting to Chrome on port ${port}...`);
+console.log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${concurrency}`);
 
-// Connect to existing Chrome with remote debugging
+// Connect or launch Chrome
 let browser;
+
 try {
   browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-} catch (e) {
-  console.error(
-    `Failed to connect to Chrome on port ${port}.\n` +
-      `Make sure Chrome is running with --remote-debugging-port=${port}\n` +
-      `Or use chrome://inspect/#remote-debugging\n\n` +
-      e.message
-  );
-  process.exit(1);
-}
-
-const context = browser.contexts()[0];
-const page = await context.newPage();
-
-let captured = 0;
-let failed = 0;
-
-for (const target of targets) {
-  const pageDir = join(outDir, target.slug);
-  console.log(`[${captured + failed + 1}/${targets.length}] ${target.url}`);
-
-  try {
-    const meta = await navigateAndCapture(page, target.url, pageDir, {
-      types,
-      waitMs,
-    });
-
-    if (meta.errors) {
-      console.log(`  ⚠ partial: ${Object.keys(meta.errors).join(", ")}`);
-    } else {
-      console.log(`  ✓ ${Object.keys(meta.captures).length} files`);
-    }
-    captured++;
-  } catch (e) {
-    console.error(`  ✗ ${e.message}`);
-    failed++;
+  console.log(`Connected to Chrome on port ${port}`);
+} catch {
+  if (values.launch) {
+    console.log("No Chrome found, launching headless...");
+    browser = await chromium.launch({ headless: true });
+  } else {
+    console.error(
+      `Failed to connect to Chrome on port ${port}.\n` +
+        `Use --launch to auto-start headless Chrome, or start Chrome manually:\n` +
+        `  google-chrome --remote-debugging-port=${port}\n`
+    );
+    process.exit(1);
   }
 }
 
-await page.close();
-browser.close();
+const context = browser.contexts()[0] || await browser.newContext();
+
+// Worker pool for parallel capture
+let captured = 0;
+let failed = 0;
+let nextIndex = 0;
+
+async function worker() {
+  const page = await context.newPage();
+  await page.setViewportSize(viewport);
+
+  while (nextIndex < targets.length) {
+    const idx = nextIndex++;
+    const target = targets[idx];
+    const pageDir = join(outDir, target.slug);
+    console.log(`[${idx + 1}/${targets.length}] ${target.url}`);
+
+    try {
+      const meta = await navigateAndCapture(page, target.url, pageDir, {
+        types,
+      });
+
+      if (meta.errors) {
+        console.log(`  ⚠ partial: ${Object.keys(meta.errors).join(", ")}`);
+      } else {
+        console.log(`  ✓ ${Object.keys(meta.captures).length} files`);
+      }
+      captured++;
+    } catch (e) {
+      console.error(`  ✗ ${e.message}`);
+      failed++;
+    }
+  }
+
+  await page.close();
+}
+
+// Launch workers up to concurrency limit (or target count if fewer)
+const workerCount = Math.min(concurrency, targets.length);
+const workers = [];
+for (let i = 0; i < workerCount; i++) {
+  workers.push(worker());
+}
+await Promise.all(workers);
+
+await browser.close();
 
 console.log(`\nDone: ${captured} captured, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);
@@ -134,11 +166,11 @@ process.exit(failed > 0 ? 1 : 0);
 function slugify(url) {
   try {
     const u = new URL(url);
-    return u.pathname
+    const path = u.pathname
       .replace(/^\/+|\/+$/g, "")
       .replace(/\//g, "-")
-      .replace(/[^a-zA-Z0-9-_]/g, "_")
-      || "index";
+      .replace(/[^a-zA-Z0-9-_]/g, "_");
+    return path ? `${u.hostname}/${path}` : u.hostname;
   } catch {
     return url.replace(/[^a-zA-Z0-9-_]/g, "_");
   }
