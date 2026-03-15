@@ -166,11 +166,11 @@ process.exit(failed > 0 ? 1 : 0);
 function slugify(url) {
   try {
     const u = new URL(url);
-    return u.pathname
+    const path = u.pathname
       .replace(/^\/+|\/+$/g, "")
       .replace(/\//g, "-")
-      .replace(/[^a-zA-Z0-9-_]/g, "_")
-      || "index";
+      .replace(/[^a-zA-Z0-9-_]/g, "_");
+    return path ? `${u.hostname}/${path}` : u.hostname;
   } catch {
     return url.replace(/[^a-zA-Z0-9-_]/g, "_");
   }
