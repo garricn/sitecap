@@ -17,7 +17,7 @@
                   "task": "Set explicit default viewport (1280x720), add --viewport flag for custom sizes",
                   "owner": "--",
                   "depends": [],
-                  "status": "pending",
+                  "status": "done",
                   "release": "v0.2.0"
                 },
                 {
@@ -25,7 +25,7 @@
                   "task": "Replace fixed 2s wait with waitForPageSettle() — MutationObserver + PerformanceObserver, 500ms quiet, 10s max",
                   "owner": "--",
                   "depends": [],
-                  "status": "pending",
+                  "status": "done",
                   "release": "v0.2.0"
                 }
               ]
@@ -39,7 +39,7 @@
                   "task": "Add --concurrency flag with worker pool (default 4 tabs). Parallel page capture in same browser context",
                   "owner": "--",
                   "depends": [],
-                  "status": "pending",
+                  "status": "done",
                   "release": "v0.2.0"
                 }
               ]
@@ -53,7 +53,7 @@
                   "task": "Auto-launch headless Chrome if no CDP endpoint found (--launch flag, or auto-detect). Reuse existing if running",
                   "owner": "--",
                   "depends": [],
-                  "status": "pending",
+                  "status": "done",
                   "release": "v0.2.0"
                 }
               ]
