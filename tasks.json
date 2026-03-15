@@ -79,6 +79,84 @@
               ]
             }
           ]
+        },
+        {
+          "id": "CORE-W3",
+          "parallelism": "PARA",
+          "phases": [
+            {
+              "id": "CORE-W3-PA",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-6",
+                  "task": "sitecap diff <dir-a> <dir-b> — compare two capture runs. Screenshot pixel diff, ARIA text diff, console/network/storage JSON diff. Plan: tasks/active/CORE-6-diff.md",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "done",
+                  "release": "v0.4.0"
+                }
+              ]
+            },
+            {
+              "id": "CORE-W3-PB",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-7",
+                  "task": "Add performance capture type — Core Web Vitals (LCP, CLS, INP) via PerformanceObserver. 7th capture file: performance.json",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "done",
+                  "release": "v0.4.0"
+                }
+              ]
+            },
+            {
+              "id": "CORE-W3-PC",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-8",
+                  "task": "Add --filter regex for crawl URL include/exclude patterns (e.g., --filter '/docs/*' --exclude '/api/*')",
+                  "owner": "--",
+                  "depends": ["CORE-5"],
+                  "status": "done",
+                  "release": "v0.4.0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CORE-W4",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "CORE-9",
+              "task": "MHTML export — save full offline-viewable archive per page alongside the 6 captures",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "v0.5.0"
+            },
+            {
+              "id": "CORE-10",
+              "task": "Add --auth flag to load cookies/storage from JSON file before capture (alternative to CDP-attach for CI)",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "v0.5.0"
+            },
+            {
+              "id": "CORE-11",
+              "task": "Add --video flag (off by default) to record page video via Playwright context.newPage({recordVideo}). Save as video.webm per page",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "v0.5.0"
+            }
+          ]
         }
       ]
     },

@@ -1,10 +1,56 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
 import { navigateAndCapture, extractLinks } from "../lib/capture.js";
+
+// Handle diff subcommand before parseArgs
+if (process.argv[2] === "diff") {
+  const args = process.argv.slice(3);
+  const dirA = args[0];
+  const dirB = args[1];
+
+  if (!dirA || !dirB || args.includes("--help") || args.includes("-h")) {
+    console.log(`sitecap diff — compare two capture directories
+
+Usage:
+  sitecap diff <dir-a> <dir-b> [options]
+
+Options:
+  --threshold <n>    Screenshot diff threshold as % (default: 0.1)
+  --output <file>    Write JSON report to file (default: terminal)
+  --types <list>     Capture types to diff (default: screenshot,accessibility,console,network,storage)
+`);
+    process.exit(0);
+  }
+
+  const { diffCaptures, formatDiffReport } = await import("../lib/diff.js");
+
+  const diffOpts = {};
+  const threshIdx = args.indexOf("--threshold");
+  if (threshIdx !== -1 && args[threshIdx + 1]) {
+    diffOpts.threshold = parseFloat(args[threshIdx + 1]);
+  }
+  const typesIdx = args.indexOf("--types");
+  if (typesIdx !== -1 && args[typesIdx + 1]) {
+    diffOpts.types = args[typesIdx + 1].split(",").map((s) => s.trim());
+  }
+  const outputIdx = args.indexOf("--output");
+  const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : null;
+
+  const report = await diffCaptures(resolve(dirA), resolve(dirB), diffOpts);
+
+  if (outputFile) {
+    await writeFile(resolve(outputFile), JSON.stringify(report, null, 2));
+    console.log(`Diff report written to ${outputFile}`);
+  } else {
+    console.log(formatDiffReport(report));
+  }
+
+  process.exit(report.identical ? 0 : 1);
+}
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -19,6 +65,8 @@ const { values, positionals } = parseArgs({
     crawl: { type: "boolean", default: false },
     "max-depth": { type: "string", default: "3" },
     "max-pages": { type: "string", default: "50" },
+    filter: { type: "string" },
+    exclude: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -34,13 +82,15 @@ Options:
   -o, --output <dir>       Output directory (default: ./output)
   -p, --port <port>        Chrome DevTools port (default: 9222)
   -t, --types <list>       Comma-separated capture types (default: all)
-                           Types: screenshot,accessibility,html,network,console,storage
+                           Types: screenshot,accessibility,html,network,console,storage,performance
   -v, --viewport <WxH>     Viewport size (default: 1280x720)
   -c, --concurrency <n>    Parallel tabs (default: 4)
   --launch                 Auto-launch headless Chrome if not running
   --crawl                  Crawl same-origin links from captured pages
   --max-depth <n>          Max crawl depth (default: 3)
   --max-pages <n>          Max pages to crawl (default: 50)
+  --filter <regex>         Only crawl URLs matching pattern
+  --exclude <regex>        Skip URLs matching pattern
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -70,6 +120,8 @@ const types = values.types ? values.types.split(",").map((s) => s.trim()) : unde
 const crawl = values.crawl;
 const maxDepth = parseInt(values["max-depth"], 10);
 const maxPages = parseInt(values["max-pages"], 10);
+const filterRe = values.filter ? new RegExp(values.filter) : null;
+const excludeRe = values.exclude ? new RegExp(values.exclude) : null;
 
 // Parse viewport
 const viewportMatch = values.viewport.match(/^(\d+)x(\d+)$/);
@@ -167,6 +219,8 @@ async function worker() {
           if (totalEnqueued >= maxPages) break;
           const norm = normalizeUrl(link);
           if (visited.has(norm)) continue;
+          if (filterRe && !filterRe.test(link)) continue;
+          if (excludeRe && excludeRe.test(link)) continue;
           visited.add(norm);
           queue.push({ url: link, slug: slugify(link), depth: target.depth + 1 });
           totalEnqueued++;
