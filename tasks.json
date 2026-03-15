@@ -1,0 +1,108 @@
+{
+  "sections": [
+    {
+      "name": "Core Improvements",
+      "prefix": "CORE",
+      "waves": [
+        {
+          "id": "CORE-W1",
+          "parallelism": "PARA",
+          "phases": [
+            {
+              "id": "CORE-W1-PA",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-1",
+                  "task": "Set explicit default viewport (1280x720), add --viewport flag for custom sizes",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "pending",
+                  "release": "v0.2.0"
+                },
+                {
+                  "id": "CORE-2",
+                  "task": "Replace fixed 2s wait with waitForPageSettle() — MutationObserver + PerformanceObserver, 500ms quiet, 10s max",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "pending",
+                  "release": "v0.2.0"
+                }
+              ]
+            },
+            {
+              "id": "CORE-W1-PB",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-3",
+                  "task": "Add --concurrency flag with worker pool (default 4 tabs). Parallel page capture in same browser context",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "pending",
+                  "release": "v0.2.0"
+                }
+              ]
+            },
+            {
+              "id": "CORE-W1-PC",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-4",
+                  "task": "Auto-launch headless Chrome if no CDP endpoint found (--launch flag, or auto-detect). Reuse existing if running",
+                  "owner": "--",
+                  "depends": [],
+                  "status": "pending",
+                  "release": "v0.2.0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CORE-W2",
+          "parallelism": "SRL",
+          "phases": [
+            {
+              "id": "CORE-W2-PA",
+              "parallelism": "SRL",
+              "tasks": [
+                {
+                  "id": "CORE-5",
+                  "task": "Add --crawl flag with BFS link extraction from rendered DOM. --max-depth N, --max-pages N. Same-origin only",
+                  "owner": "--",
+                  "depends": ["CORE-2", "CORE-3"],
+                  "status": "pending",
+                  "release": "v0.3.0"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ecosystem",
+      "prefix": "ECO",
+      "tasks": [
+        {
+          "id": "ECO-1",
+          "task": "sitegrade --browser integration: generate manifest from crawl URLs, run sitecap, feed rendered DOM + captures into analyzers",
+          "owner": "--",
+          "depends": ["CORE-5"],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "ECO-2",
+          "task": "Evaluate sitetest.dev — full UI testing tool with CDP-attached interactions, flows, and multi-capture assertions",
+          "owner": "--",
+          "depends": [],
+          "status": "backlog",
+          "release": "--"
+        }
+      ]
+    }
+  ]
+}
