@@ -209,7 +209,7 @@
               "task": "Library entry point — index.js exporting capturePage, navigateAndCapture, extractLinks, diffCaptures, waitForPageSettle",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.6.0"
             },
             {
@@ -217,7 +217,7 @@
               "task": "MCP server — expose sitecap as tools (capture, diff, crawl) for Claude Code and agent workflows",
               "owner": "--",
               "depends": ["INT-1"],
-              "status": "pending",
+              "status": "done",
               "release": "v0.6.0"
             }
           ]
@@ -231,15 +231,15 @@
               "task": "REST API — HTTP server with POST /capture, POST /diff, POST /crawl endpoints for cross-language consumption",
               "owner": "--",
               "depends": ["INT-1"],
-              "status": "pending",
-              "release": "v0.7.0"
+              "status": "done",
+              "release": "v0.6.0"
             },
             {
               "id": "INT-4",
               "task": "Skill.md — /capture slash command for Claude Code",
               "owner": "--",
               "depends": ["INT-1"],
-              "status": "pending",
+              "status": "done",
               "release": "v0.6.0"
             }
           ]
