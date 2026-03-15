@@ -86,7 +86,7 @@ console.log(`Connecting to Chrome on port ${port}...`);
 // Connect to existing Chrome with remote debugging
 let browser;
 try {
-  browser = await chromium.connectOverCDP(`http://localhost:${port}`);
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
 } catch (e) {
   console.error(
     `Failed to connect to Chrome on port ${port}.\n` +
@@ -126,7 +126,7 @@ for (const target of targets) {
 }
 
 await page.close();
-browser.disconnect();
+browser.close();
 
 console.log(`\nDone: ${captured} captured, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);
