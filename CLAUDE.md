@@ -13,6 +13,7 @@ Exhaustive web page capture tool. Connects to your running Chrome via CDP (inher
 ```
 bin/sitecap.js    — CLI entry point (capture + diff subcommands)
 lib/capture.js    — core capture logic (capturePage, navigateAndCapture, waitForPageSettle, extractLinks)
+lib/chrome.js     — Chrome profile discovery and launch (findChromeExecutable, resolveProfileDir, launchChromeWithProfile)
 lib/diff.js       — diff logic for comparing two capture directories
 ```
 
@@ -29,7 +30,9 @@ make check                                               # lint + test
 
 ## Chrome Connection
 
-- **Attach** (default): connects to `--remote-debugging-port` (default 9222). Inherits all cookies, sessions, profiles from the running Chrome. This is the primary workflow for authenticated captures.
+Four modes:
+- **Attach** (default): connects to `--remote-debugging-port` (default 9222). Inherits all cookies, sessions, profiles.
+- **Profile** (`--profile <name>`): launches real Chrome with user's profile (cookies, auth, extensions). Chrome must not already be running.
 - **Launch** (`--launch`): auto-launches headless Chromium. Clean session, no auth. For public sites and CI.
 - **Auth** (`--auth <file>`): loads cookies from JSON into a launched browser. For CI with auth.
 
