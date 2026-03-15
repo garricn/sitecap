@@ -1,0 +1,19 @@
+{
+  "name": "sitecap",
+  "version": "0.1.0",
+  "description": "Exhaustive web page capture — screenshot, accessibility tree, HTML source, network requests, console logs, storage state.",
+  "type": "module",
+  "bin": {
+    "sitecap": "./bin/sitecap.js"
+  },
+  "scripts": {
+    "start": "node bin/sitecap.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": ["capture", "archive", "screenshot", "accessibility", "web"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}
