@@ -137,7 +137,7 @@
               "task": "MHTML export — save full offline-viewable archive per page alongside the 6 captures",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.5.0"
             },
             {
@@ -145,7 +145,7 @@
               "task": "Add --auth flag to load cookies/storage from JSON file before capture (alternative to CDP-attach for CI)",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.5.0"
             },
             {
@@ -153,7 +153,7 @@
               "task": "Add --video flag (off by default) to record page video via Playwright context.newPage({recordVideo}). Save as video.webm per page",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.5.0"
             }
           ]
