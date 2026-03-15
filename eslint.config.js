@@ -20,6 +20,7 @@ export default [
         sessionStorage: "readonly",
         document: "readonly",
         performance: "readonly",
+        fetch: "readonly",
       },
     },
   },

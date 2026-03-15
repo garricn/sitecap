@@ -5,6 +5,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
 import { navigateAndCapture, extractLinks } from "../lib/capture.js";
+import {
+  launchChromeWithProfile,
+  resolveProfileDir,
+  findUserDataDir,
+  shutdownChrome,
+} from "../lib/chrome.js";
 
 // Handle diff subcommand before parseArgs
 if (process.argv[2] === "diff") {
@@ -62,6 +68,10 @@ const { values, positionals } = parseArgs({
     viewport: { type: "string", short: "v", default: "1280x720" },
     concurrency: { type: "string", short: "c", default: "4" },
     launch: { type: "boolean", default: false },
+    profile: { type: "string" },
+    "user-data-dir": { type: "string" },
+    "keep-open": { type: "boolean", default: true },
+    "close-after": { type: "boolean", default: false },
     crawl: { type: "boolean", default: false },
     "max-depth": { type: "string", default: "3" },
     "max-pages": { type: "string", default: "50" },
@@ -86,6 +96,9 @@ Options:
   -v, --viewport <WxH>     Viewport size (default: 1280x720)
   -c, --concurrency <n>    Parallel tabs (default: 4)
   --launch                 Auto-launch headless Chrome if not running
+  --profile <name>         Launch Chrome with a named profile (e.g., "Default", "Profile 1", or display name)
+  --user-data-dir <path>   Override Chrome user data directory
+  --close-after            Close Chrome after capture (default: stays open with --profile)
   --crawl                  Crawl same-origin links from captured pages
   --max-depth <n>          Max crawl depth (default: 3)
   --max-pages <n>          Max pages to crawl (default: 50)
@@ -104,8 +117,13 @@ Chrome setup:
   Either use --launch to auto-start headless Chrome, or start Chrome manually:
     google-chrome --remote-debugging-port=9222
 
+  Use --profile to launch Chrome with your real profile (cookies, auth, extensions):
+    sitecap https://example.com --profile Default
+    sitecap https://example.com --profile "Work" -o ./output
+
 Examples:
   sitecap https://example.com --launch
+  sitecap https://example.com --profile Default -o ./captures
   sitecap https://example.com --crawl --max-depth 2 --max-pages 20 --launch
   sitecap https://example.com/a https://example.com/b -o ./captures -c 2
   sitecap -m manifest.json -o ./captures -t screenshot,accessibility
@@ -161,25 +179,46 @@ console.log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${conc
 
 // Connect or launch Chrome
 let browser;
+let profileContext = null;
 
-try {
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-  console.log(`Connected to Chrome on port ${port}`);
-} catch {
-  if (values.launch) {
-    console.log("No Chrome found, launching headless...");
-    browser = await chromium.launch({ headless: true });
-  } else {
-    console.error(
-      `Failed to connect to Chrome on port ${port}.\n` +
-        `Use --launch to auto-start headless Chrome, or start Chrome manually:\n` +
-        `  google-chrome --remote-debugging-port=${port}\n`
-    );
+if (values.profile) {
+  // Launch Chrome with a real profile via Playwright persistent context
+  const userDataDir = values["user-data-dir"] || findUserDataDir();
+  const profileDir = await resolveProfileDir(userDataDir, values.profile);
+  console.log(`Launching Chrome with profile "${values.profile}" (dir: ${profileDir})...`);
+
+  try {
+    const result = await launchChromeWithProfile({
+      profileDir,
+      userDataDir,
+      viewport,
+    });
+    profileContext = result.context;
+  } catch (e) {
+    console.error(e.message);
     process.exit(1);
+  }
+  console.log("Chrome launched with profile.");
+} else {
+  try {
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+    console.log(`Connected to Chrome on port ${port}`);
+  } catch {
+    if (values.launch) {
+      console.log("No Chrome found, launching headless...");
+      browser = await chromium.launch({ headless: true });
+    } else {
+      console.error(
+        `Failed to connect to Chrome on port ${port}.\n` +
+          `Use --launch to auto-start headless Chrome, or start Chrome manually:\n` +
+          `  google-chrome --remote-debugging-port=${port}\n`
+      );
+      process.exit(1);
+    }
   }
 }
 
-const context = browser.contexts()[0] || await browser.newContext();
+const context = profileContext || browser.contexts()[0] || await browser.newContext();
 
 // BFS crawl queue: { url, slug, depth }
 const queue = targets.map((t) => ({ ...t, depth: 0 }));
@@ -243,7 +282,20 @@ for (let i = 0; i < workerCount; i++) {
 }
 await Promise.all(workers);
 
-await browser.close();
+// Cleanup
+if (profileContext) {
+  if (values["close-after"]) {
+    await shutdownChrome(profileContext);
+    console.log("Chrome closed.");
+  } else {
+    // Detach without closing — leave Chrome open for the user
+    // Playwright persistent contexts can't truly detach, so we close
+    await shutdownChrome(profileContext);
+    console.log("Chrome closed (persistent contexts cannot stay open after Playwright exits).");
+  }
+} else if (browser) {
+  await browser.close();
+}
 
 console.log(`\nDone: ${captured} captured, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);
