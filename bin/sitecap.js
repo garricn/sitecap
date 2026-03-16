@@ -232,6 +232,13 @@ if (values.profile) {
     console.log("\nLog in, then press Enter to continue...");
     const rl = createInterface({ input: process.stdin });
     await new Promise((resolve) => rl.once("line", () => { rl.close(); resolve(); }));
+
+    // Save Google cookies for future --auto-auth google runs
+    const { saveGoogleAuthCookies } = await import("../lib/auth.js");
+    const userDataDirForSave = values["user-data-dir"] || findUserDataDir();
+    const profileDirForSave = await resolveProfileDir(userDataDirForSave, values.profile);
+    await saveGoogleAuthCookies(profileContext, profileDirForSave);
+
     console.log("Continuing with capture...");
   }
 } else {
