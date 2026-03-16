@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
-import { createInterface } from "node:readline";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
@@ -224,21 +223,24 @@ if (values.profile) {
 
   // Wait for user to authenticate if requested
   if (values["wait-for-auth"]) {
-    if (values["auth-url"]) {
-      const authPage = await profileContext.newPage();
-      await authPage.goto(values["auth-url"], { waitUntil: "domcontentloaded", timeout: 30_000 });
-      console.log(`Navigated to ${values["auth-url"]}`);
-    }
-    console.log("\nLog in, then press Enter to continue...");
-    const rl = createInterface({ input: process.stdin });
-    await new Promise((resolve) => rl.once("line", () => { rl.close(); resolve(); }));
+    const authPage = await profileContext.newPage();
+    const authUrl = values["auth-url"] || targets[0].url;
+    await authPage.goto(authUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const loginUrl = authPage.url();
+    console.log(`Navigated to ${loginUrl}`);
+    console.log("Waiting for auth (complete login in Chrome, URL change will be detected)...");
 
-    // Save Google cookies for future --auto-auth google runs
+    // Poll for URL change — non-interactive, detects when login redirects
+    await authPage.waitForURL((url) => url.href !== loginUrl, { timeout: 120_000 });
+    console.log(`Auth detected: ${authPage.url()}`);
+
+    // Save cookies for future runs
     const { saveGoogleAuthCookies } = await import("../lib/auth.js");
     const userDataDirForSave = values["user-data-dir"] || findUserDataDir();
     const profileDirForSave = await resolveProfileDir(userDataDirForSave, values.profile);
     await saveGoogleAuthCookies(profileContext, profileDirForSave);
 
+    await authPage.close();
     console.log("Continuing with capture...");
   }
 } else {
