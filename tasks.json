@@ -305,7 +305,7 @@
               "task": "Cross-origin iframe content capture — use CDP Accessibility.getFullAXTree + DOM for iframe content. Closes #19. Plan: tasks/active/DEEP-1-iframe-capture.md",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.8.0"
             },
             {
@@ -313,7 +313,7 @@
               "task": "Click-flow YAML for page exploration — foreach/capture steps to click through tabs, panels, nodes. Closes #20. Plan: tasks/active/DEEP-2-click-flow.md",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "v0.8.0"
             }
           ]

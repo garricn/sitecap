@@ -81,6 +81,7 @@ const { values, positionals } = parseArgs({
     "wait-for-auth": { type: "boolean", default: false },
     "auth-url": { type: "string" },
     "auth-flow": { type: "string" },
+    explore: { type: "string" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -113,6 +114,7 @@ Options:
   --wait-for-auth          Launch Chrome, wait for user to log in, then capture
   --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
   --auth-flow <file>       Run auth flow from YAML before capture (e.g., login steps)
+  --explore <file>         Run exploration flow (foreach/capture steps) after page load
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -296,6 +298,29 @@ if (values["auth-flow"]) {
     console.log("Auth flow did not complete — proceeding without auth.");
   }
   await authPage.close();
+}
+
+// Run exploration flow if provided
+if (values.explore) {
+  const { runAuthFlow } = await import("../lib/auth.js");
+  const explorePage = await context.newPage();
+  await explorePage.setViewportSize(viewport);
+
+  const exploreTarget = targets[0].url;
+  await explorePage.goto(exploreTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await explorePage.waitForLoadState("networkidle").catch(() => {});
+
+  const success = await runAuthFlow(resolve(values.explore), explorePage, context, {
+    outDir,
+    types,
+  });
+
+  if (success) {
+    console.log("Exploration flow completed.");
+  } else {
+    console.log("Exploration flow did not complete.");
+  }
+  await explorePage.close();
 }
 
 // BFS crawl queue: { url, slug, depth }
