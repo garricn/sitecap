@@ -201,10 +201,10 @@ if (values["auto-auth"] && !values.profile) {
 
 // Connect or launch Chrome
 let browser;
-let chromeProcess = null;
+let profileContext = null;
 
 if (values.profile) {
-  // Launch real Chrome with profile via CDP (preserves FedCM/Google identity)
+  // Launch Chrome with profile via Playwright persistent context
   const userDataDir = values["user-data-dir"] || findUserDataDir();
   const profileDir = await resolveProfileDir(userDataDir, values.profile);
   console.log(`Launching Chrome with profile "${values.profile}" (dir: ${profileDir})...`);
@@ -213,21 +213,19 @@ if (values.profile) {
     const result = await launchChromeWithProfile({
       profileDir,
       userDataDir,
-      port,
+      viewport,
     });
-    browser = result.browser;
-    chromeProcess = result.chromeProcess;
+    profileContext = result.context;
   } catch (e) {
     console.error(e.message);
     process.exit(1);
   }
-  console.log("Chrome launched with profile (CDP connection).");
+  console.log("Chrome launched with profile.");
 
   // Wait for user to authenticate if requested
   if (values["wait-for-auth"]) {
-    const context = browser.contexts()[0] || await browser.newContext();
     if (values["auth-url"]) {
-      const authPage = await context.newPage();
+      const authPage = await profileContext.newPage();
       await authPage.goto(values["auth-url"], { waitUntil: "domcontentloaded", timeout: 30_000 });
       console.log(`Navigated to ${values["auth-url"]}`);
     }
@@ -255,7 +253,7 @@ if (values.profile) {
   }
 }
 
-const context = browser.contexts()[0] || await browser.newContext();
+const context = profileContext || browser.contexts()[0] || await browser.newContext();
 
 // Load auth state (cookies/storage) if provided
 if (values.auth) {
@@ -392,14 +390,13 @@ for (let i = 0; i < workerCount; i++) {
 await Promise.all(workers);
 
 // Cleanup
-if (chromeProcess) {
+if (profileContext) {
   if (values["close-after"]) {
-    await shutdownChrome(browser, chromeProcess);
+    await shutdownChrome(profileContext);
     console.log("Chrome closed.");
   } else {
-    // Disconnect CDP but leave Chrome running for the user
-    await browser.close();
-    console.log("Disconnected from Chrome (Chrome stays open).");
+    await shutdownChrome(profileContext);
+    console.log("Chrome closed (persistent contexts cannot stay open after Playwright exits).");
   }
 } else if (browser) {
   await browser.close();
