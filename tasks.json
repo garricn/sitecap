@@ -201,6 +201,30 @@
           "depends": ["AUTH-1"],
           "status": "done",
           "release": "v0.7.0"
+        },
+        {
+          "id": "AUTH-3",
+          "task": "Investigate API token auth — inject API keys as cookies/headers for machine-to-machine auth. No browser login needed. Test with GHL API.",
+          "owner": "--",
+          "depends": [],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "AUTH-4",
+          "task": "Investigate Google service accounts — domain-wide delegation to impersonate users programmatically. No browser, no OAuth, no human.",
+          "owner": "--",
+          "depends": [],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "AUTH-5",
+          "task": "Investigate email/password bot accounts — dedicated bot user per site, auth via --auth-flow YAML (fill email/password, submit). No OAuth dependency.",
+          "owner": "--",
+          "depends": [],
+          "status": "backlog",
+          "release": "--"
         }
       ]
     },
