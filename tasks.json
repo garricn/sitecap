@@ -161,6 +161,20 @@
       ]
     },
     {
+      "name": "Demo",
+      "prefix": "DEMO",
+      "tasks": [
+        {
+          "id": "DEMO-1",
+          "task": "Canned demo capture — run sitecap on sitecap.dev (or sitefix site), commit sanitized output as examples/ for README and landing page",
+          "owner": "--",
+          "depends": [],
+          "status": "backlog",
+          "release": "--"
+        }
+      ]
+    },
+    {
       "name": "Ecosystem",
       "prefix": "ECO",
       "tasks": [
