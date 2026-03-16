@@ -16,7 +16,7 @@
     "start": "node bin/sitecap.js",
     "mcp": "node bin/mcp-server.js",
     "api": "node bin/api-server.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "vitest run"
   },
   "keywords": [
     "capture",
@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.0.3"
+    "eslint": "^10.0.3",
+    "vitest": "^4.1.0"
   }
 }
