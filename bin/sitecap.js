@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
 import { navigateAndCapture, extractLinks } from "../lib/capture.js";
@@ -84,6 +84,7 @@ const { values, positionals } = parseArgs({
     explore: { type: "string" },
     "network-filter": { type: "string", default: "all" },
     video: { type: "boolean", default: false },
+    "session-video": { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -117,7 +118,8 @@ Options:
   --auth-flow <file>       Run auth flow from YAML before capture (e.g., login steps)
   --explore <file>         Run exploration flow (foreach/capture steps) after page load
   --network-filter <mode>  Network capture: all (default), xhr (API only), none
-  --video                  Record page video (off by default)
+  --video                  Record per-page video clips (off by default)
+  --session-video          Record one continuous video across all pages
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -148,7 +150,7 @@ Examples:
 
 const outDir = resolve(values.output);
 const port = parseInt(values.port, 10);
-const concurrency = Math.max(1, parseInt(values.concurrency, 10));
+let concurrency = Math.max(1, parseInt(values.concurrency, 10));
 const types = values.types ? values.types.split(",").map((s) => s.trim()) : undefined;
 const crawl = values.crawl;
 const maxDepth = parseInt(values["max-depth"], 10);
@@ -200,6 +202,14 @@ if (values["wait-for-auth"] && !values.profile) {
 if (values["auth-flow"] && !values.profile && !values.launch) {
   console.error("--auth-flow requires --profile or --launch (need a browser to run auth steps)");
   process.exit(1);
+}
+if (values.video && values["session-video"]) {
+  console.error("--video and --session-video are mutually exclusive");
+  process.exit(1);
+}
+if (values["session-video"] && concurrency > 1) {
+  console.log("Warning: --session-video requires sequential capture, forcing concurrency=1");
+  concurrency = 1;
 }
 
 // Connect or launch Chrome
@@ -267,7 +277,8 @@ if (values.profile) {
   }
 }
 
-const context = profileContext || browser.contexts()[0] || await browser.newContext();
+const sessionVideoOpts = values["session-video"] ? { recordVideo: { dir: outDir } } : {};
+const context = profileContext || browser.contexts()[0] || await browser.newContext(sessionVideoOpts);
 
 // Load auth state (cookies/storage) if provided
 if (values.auth) {
@@ -422,6 +433,15 @@ for (let i = 0; i < workerCount; i++) {
 }
 await Promise.all(workers);
 
+// Finalize session video — get video path before closing context
+let sessionVideoSrc = null;
+if (values["session-video"]) {
+  const pages = context.pages();
+  if (pages.length > 0 && pages[0].video()) {
+    sessionVideoSrc = await pages[0].video().path();
+  }
+}
+
 // Cleanup
 if (profileContext) {
   if (values["close-after"]) {
@@ -433,6 +453,17 @@ if (profileContext) {
   }
 } else if (browser) {
   await browser.close();
+}
+
+// Rename session video after context/browser close (video file is finalized)
+if (sessionVideoSrc) {
+  const destPath = join(outDir, "session-video.webm");
+  try {
+    await rename(sessionVideoSrc, destPath);
+    console.log(`Session video: ${destPath}`);
+  } catch {
+    // video file may not exist if all pages failed
+  }
 }
 
 console.log(`\nDone: ${captured} captured, ${failed} failed.`);

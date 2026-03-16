@@ -25,6 +25,10 @@ export const tools = [
           "default": "1280x720",
           "description": "Viewport WxH",
           "type": "string"
+        },
+        "sessionVideo": {
+          "description": "Record one continuous video across all pages",
+          "type": "boolean"
         }
       },
       "required": [
@@ -93,6 +97,10 @@ export const tools = [
         "exclude": {
           "description": "Regex to exclude URLs",
           "type": "string"
+        },
+        "sessionVideo": {
+          "description": "Record one continuous video across all pages",
+          "type": "boolean"
         }
       },
       "required": [
