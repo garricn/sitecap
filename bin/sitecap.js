@@ -82,6 +82,7 @@ const { values, positionals } = parseArgs({
     "auth-url": { type: "string" },
     "auth-flow": { type: "string" },
     explore: { type: "string" },
+    "network-filter": { type: "string", default: "all" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -115,6 +116,7 @@ Options:
   --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
   --auth-flow <file>       Run auth flow from YAML before capture (e.g., login steps)
   --explore <file>         Run exploration flow (foreach/capture steps) after page load
+  --network-filter <mode>  Network capture: all (default), xhr (API only), none
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -362,6 +364,7 @@ async function worker() {
     try {
       const meta = await navigateAndCapture(activePage, target.url, pageDir, {
         types,
+        networkFilter: values["network-filter"],
       });
 
       if (meta.errors) {

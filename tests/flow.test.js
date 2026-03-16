@@ -4,13 +4,16 @@ import { writeFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { runAuthFlow } from "../lib/auth.js";
+import { startTestServer } from "./helpers/server.js";
 
 const TEST_DIR = "/tmp/sitecap-test-flow";
 
 describe("flow executor", () => {
-  let browser, context, page;
+  let browser, context, page, server, baseUrl;
 
   beforeAll(async () => {
+    server = await startTestServer();
+    baseUrl = server.url;
     browser = await chromium.launch({ headless: true });
     context = await browser.newContext();
     page = await context.newPage();
@@ -19,6 +22,7 @@ describe("flow executor", () => {
 
   afterAll(async () => {
     await browser.close();
+    await server.close();
     await rm(TEST_DIR, { recursive: true, force: true });
   });
 
@@ -28,31 +32,30 @@ describe("flow executor", () => {
       await writeFile(flowPath, `
 name: goto-test
 steps:
-  - goto: https://example.com
+  - goto: ${baseUrl}
   - wait: settle
 `);
       await page.goto("about:blank");
       const result = await runAuthFlow(flowPath, page, context);
       expect(result).toBe(true);
-      expect(page.url()).toBe("https://example.com/");
+      expect(page.url()).toBe(`${baseUrl}/`);
     });
 
     it("executes click step", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "click-flow.yaml");
       await writeFile(flowPath, `
 name: click-test
 steps:
-  - click: "a:has-text('More information')"
-    optional: true
-    timeout: 2000
+  - click: "a:has-text('About')"
+    timeout: 3000
 `);
       const result = await runAuthFlow(flowPath, page, context);
       expect(result).toBe(true);
     }, 15_000);
 
     it("handles optional steps gracefully", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "optional-flow.yaml");
       await writeFile(flowPath, `
 name: optional-test
@@ -67,7 +70,7 @@ steps:
     });
 
     it("fails on non-optional missing element", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "fail-flow.yaml");
       await writeFile(flowPath, `
 name: fail-test
@@ -82,7 +85,7 @@ steps:
 
   describe("env var resolution", () => {
     it("fails on missing env var", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "env-missing.yaml");
       await writeFile(flowPath, `
 name: env-missing
@@ -98,7 +101,7 @@ steps:
 
   describe("capture step", () => {
     it("captures to named subdirectory", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "capture-flow.yaml");
       const captureOutDir = join(TEST_DIR, "captures");
       await writeFile(flowPath, `
@@ -119,7 +122,7 @@ steps:
 
   describe("foreach step", () => {
     it("iterates over matching elements", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "foreach-flow.yaml");
       const captureOutDir = join(TEST_DIR, "foreach-captures");
       await writeFile(flowPath, `
@@ -136,12 +139,11 @@ steps:
         types: ["html"],
       });
       expect(result).toBe(true);
-      // example.com has at least 1 paragraph
       expect(existsSync(join(captureOutDir, "paragraph-0", "page-source.html"))).toBe(true);
     });
 
     it("handles zero elements gracefully", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const flowPath = join(TEST_DIR, "foreach-empty.yaml");
       await writeFile(flowPath, `
 name: foreach-empty
@@ -160,17 +162,15 @@ steps:
 
   describe("cookie steps", () => {
     it("saves and restores cookies", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
 
-      // Add a test cookie
       await context.addCookies([{
         name: "test_cookie",
         value: "test_value",
-        domain: "example.com",
+        domain: "127.0.0.1",
         path: "/",
       }]);
 
-      // Save and restore must use the SAME flow path (cache key is derived from path)
       const flowPath = join(TEST_DIR, "cookie-roundtrip.yaml");
 
       await writeFile(flowPath, `
@@ -181,10 +181,8 @@ steps:
       const result = await runAuthFlow(flowPath, page, context);
       expect(result).toBe(true);
 
-      // Clear cookies
       await context.clearCookies();
 
-      // Restore using same flow path
       await writeFile(flowPath, `
 name: cookie-restore
 steps:

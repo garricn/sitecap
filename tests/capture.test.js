@@ -4,13 +4,16 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { capturePage, navigateAndCapture, extractLinks, waitForPageSettle } from "../lib/capture.js";
+import { startTestServer } from "./helpers/server.js";
 
 const TEST_DIR = "/tmp/sitecap-test-capture";
 
 describe("capture", () => {
-  let browser, context, page;
+  let browser, context, page, server, baseUrl;
 
   beforeAll(async () => {
+    server = await startTestServer();
+    baseUrl = server.url;
     browser = await chromium.launch({ headless: true });
     context = await browser.newContext();
     page = await context.newPage();
@@ -18,16 +21,17 @@ describe("capture", () => {
 
   afterAll(async () => {
     await browser.close();
+    await server.close();
     await rm(TEST_DIR, { recursive: true, force: true });
   });
 
   describe("capturePage", () => {
     it("captures all default types", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const outDir = join(TEST_DIR, "all-types");
       const meta = await capturePage(page, outDir);
 
-      expect(meta.url).toBe("https://example.com/");
+      expect(meta.url).toBe(`${baseUrl}/`);
       expect(meta.timestamp).toBeDefined();
       expect(meta.captures.screenshot).toContain("screenshot.png");
       expect(meta.captures.accessibility).toContain("accessibility.txt");
@@ -38,7 +42,7 @@ describe("capture", () => {
     });
 
     it("captures only requested types", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const outDir = join(TEST_DIR, "selective");
       const meta = await capturePage(page, outDir, { types: ["screenshot", "html"] });
 
@@ -51,7 +55,6 @@ describe("capture", () => {
     it("writes valid screenshot PNG", async () => {
       const outDir = join(TEST_DIR, "all-types");
       const data = await readFile(join(outDir, "screenshot.png"));
-      // PNG magic bytes
       expect(data[0]).toBe(0x89);
       expect(data[1]).toBe(0x50);
       expect(data[2]).toBe(0x4e);
@@ -62,7 +65,6 @@ describe("capture", () => {
       const outDir = join(TEST_DIR, "all-types");
       const tree = await readFile(join(outDir, "accessibility.txt"), "utf-8");
       expect(tree.length).toBeGreaterThan(0);
-      // CDP tree starts with RootWebArea, ariaSnapshot starts with "- document"
       expect(tree).toMatch(/RootWebArea|document/);
     });
 
@@ -70,14 +72,14 @@ describe("capture", () => {
       const outDir = join(TEST_DIR, "all-types");
       const html = await readFile(join(outDir, "page-source.html"), "utf-8");
       expect(html).toContain("<html");
-      expect(html).toContain("Example Domain");
+      expect(html).toContain("Test Page");
     });
 
     it("writes valid performance.json", async () => {
       const outDir = join(TEST_DIR, "all-types");
       const perf = JSON.parse(await readFile(join(outDir, "performance.json"), "utf-8"));
       expect(perf.navigation).toBeDefined();
-      expect(perf.navigation.ttfb).toBeGreaterThan(0);
+      expect(perf.navigation.ttfb).toBeGreaterThanOrEqual(0);
       expect(perf.resources).toBeDefined();
       expect(perf.resources.count).toBeGreaterThanOrEqual(0);
     });
@@ -94,7 +96,7 @@ describe("capture", () => {
     it("writes meta.json", async () => {
       const outDir = join(TEST_DIR, "all-types");
       const meta = JSON.parse(await readFile(join(outDir, "meta.json"), "utf-8"));
-      expect(meta.url).toBe("https://example.com/");
+      expect(meta.url).toBe(`${baseUrl}/`);
       expect(meta.timestamp).toBeDefined();
       expect(meta.captures).toBeDefined();
     });
@@ -103,31 +105,30 @@ describe("capture", () => {
   describe("navigateAndCapture", () => {
     it("navigates and captures in one call", async () => {
       const outDir = join(TEST_DIR, "nav-capture");
-      const meta = await navigateAndCapture(page, "https://example.com", outDir, {
+      const meta = await navigateAndCapture(page, baseUrl, outDir, {
         types: ["html", "screenshot"],
       });
 
-      expect(meta.url).toBe("https://example.com/");
+      expect(meta.url).toBe(`${baseUrl}/`);
       expect(meta.captures.html).toBeDefined();
       expect(meta.captures.screenshot).toBeDefined();
     });
 
     it("captures network requests", async () => {
       const outDir = join(TEST_DIR, "nav-network");
-      await navigateAndCapture(page, "https://example.com", outDir);
+      await navigateAndCapture(page, baseUrl, outDir);
 
       const network = JSON.parse(await readFile(join(outDir, "network.json"), "utf-8"));
       expect(Array.isArray(network)).toBe(true);
-      // example.com has at least the document request
       expect(network.length).toBeGreaterThan(0);
-      expect(network[0].url).toContain("example.com");
+      expect(network[0].url).toContain("127.0.0.1");
       expect(network[0].status).toBe(200);
       expect(network[0].timing).toBeDefined();
     });
 
     it("captures console messages", async () => {
       const outDir = join(TEST_DIR, "nav-console");
-      await navigateAndCapture(page, "https://example.com", outDir);
+      await navigateAndCapture(page, baseUrl, outDir);
 
       const consolePath = join(outDir, "console.json");
       expect(existsSync(consolePath)).toBe(true);
@@ -138,25 +139,33 @@ describe("capture", () => {
 
   describe("extractLinks", () => {
     it("extracts same-origin links", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const links = await extractLinks(page);
 
       expect(Array.isArray(links)).toBe(true);
-      // example.com has a "More information..." link to iana.org — should be filtered out
+      expect(links.length).toBe(2); // /about and /contact (external filtered out)
       for (const link of links) {
-        expect(new URL(link).origin).toBe("https://example.com");
+        expect(link).toContain("127.0.0.1");
+      }
+    });
+
+    it("filters out external links", async () => {
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
+      const links = await extractLinks(page);
+      for (const link of links) {
+        expect(link).not.toContain("external.example.com");
       }
     });
 
     it("deduplicates links", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const links = await extractLinks(page);
       const unique = new Set(links);
       expect(links.length).toBe(unique.size);
     });
 
     it("strips fragments", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const links = await extractLinks(page);
       for (const link of links) {
         expect(link).not.toContain("#");
@@ -166,18 +175,16 @@ describe("capture", () => {
 
   describe("waitForPageSettle", () => {
     it("settles on a static page quickly", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const start = Date.now();
       await waitForPageSettle(page, { quietMs: 200, maxTimeout: 5000 });
       const elapsed = Date.now() - start;
-      // Should settle in ~200ms on a static page, not wait the full 5s
       expect(elapsed).toBeLessThan(2000);
     });
 
     it("respects maxTimeout", async () => {
-      await page.goto("https://example.com", { waitUntil: "networkidle" });
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
       const start = Date.now();
-      // Very short maxTimeout
       await waitForPageSettle(page, { quietMs: 200, maxTimeout: 100 });
       const elapsed = Date.now() - start;
       expect(elapsed).toBeLessThan(1000);
