@@ -193,6 +193,14 @@
           "depends": [],
           "status": "done",
           "release": "v0.6.0"
+        },
+        {
+          "id": "AUTH-2",
+          "task": "Add --auto-auth google: automate Google OAuth flow — detect sign-in button, click, select account in popup, wait for redirect. Closes #14. Plan: tasks/active/AUTH-2-auto-auth.md",
+          "owner": "--",
+          "depends": ["AUTH-1"],
+          "status": "done",
+          "release": "v0.7.0"
         }
       ]
     },
@@ -241,6 +249,20 @@
               "depends": ["INT-1"],
               "status": "done",
               "release": "v0.6.0"
+            }
+          ]
+        },
+        {
+          "id": "INT-W3",
+          "parallelism": "SRL",
+          "tasks": [
+            {
+              "id": "INT-5",
+              "task": "Schema-driven API codegen — defineOp() + Zod schemas → generate MCP, REST, OpenAPI, tools.json from single source. Plan: tasks/active/INT-5-api-codegen.md",
+              "owner": "--",
+              "depends": ["INT-1", "INT-2", "INT-3"],
+              "status": "pending",
+              "release": "v0.7.0"
             }
           ]
         }

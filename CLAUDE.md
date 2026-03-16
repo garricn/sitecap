@@ -34,9 +34,13 @@ Four modes:
 - **Attach** (default): connects to `--remote-debugging-port` (default 9222). Inherits all cookies, sessions, profiles.
 - **Profile** (`--profile <name>`): launches real Chrome with user's profile (cookies, auth, extensions). Chrome must not already be running.
 - **Launch** (`--launch`): auto-launches headless Chromium. Clean session, no auth. For public sites and CI.
-- **Auth** (`--auth <file>`): loads cookies from JSON into a launched browser. For CI with auth.
+- **Auth** (`--auth <file>`): loads cookies from JSON into a launched browser. For CI/automated auth.
+- **Wait-for-auth** (`--wait-for-auth`): launches Chrome with profile, polls for URL change after login, saves cookies for future runs.
+- **Auth flow** (`--auth-flow <file>`): user-defined YAML with click/fill/wait steps for complex login sequences.
 
-To use attach mode: `open -a "Google Chrome" --args --remote-debugging-port=9222`
+Authenticated workflow: `--profile --wait-for-auth` once (saves cookies) → `--launch --auth <cookies>` for all subsequent runs (headless, no modal).
+
+To use attach mode: `open -a "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug` (Chrome 136+ requires `--user-data-dir`).
 
 ## Capture Types
 
