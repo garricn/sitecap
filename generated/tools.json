@@ -2,7 +2,7 @@
   {
     "name": "sitecap_capture",
     "description": "Capture a web page — screenshot, accessibility tree, HTML, network, console, storage, performance",
-    "parameters": {
+    "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
@@ -36,7 +36,7 @@
   {
     "name": "sitecap_diff",
     "description": "Compare two sitecap capture directories",
-    "parameters": {
+    "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
@@ -63,7 +63,7 @@
   {
     "name": "sitecap_crawl",
     "description": "Crawl a site and capture all same-origin pages",
-    "parameters": {
+    "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
@@ -107,7 +107,7 @@
   {
     "name": "sitecap_read_capture",
     "description": "Read a specific file from a sitecap capture directory",
-    "parameters": {
+    "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
