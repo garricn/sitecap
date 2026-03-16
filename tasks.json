@@ -223,7 +223,7 @@
           "task": "Investigate email/password bot accounts — dedicated bot user per site, auth via --auth-flow YAML (fill email/password, submit). No OAuth dependency.",
           "owner": "--",
           "depends": [],
-          "status": "backlog",
+          "status": "done",
           "release": "--"
         }
       ]
@@ -287,6 +287,34 @@
               "depends": ["INT-1", "INT-2", "INT-3"],
               "status": "pending",
               "release": "v0.7.0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Deep Capture",
+      "prefix": "DEEP",
+      "waves": [
+        {
+          "id": "DEEP-W1",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "DEEP-1",
+              "task": "Cross-origin iframe content capture — use CDP Accessibility.getFullAXTree + DOM for iframe content. Closes #19. Plan: tasks/active/DEEP-1-iframe-capture.md",
+              "owner": "--",
+              "depends": [],
+              "status": "done",
+              "release": "v0.8.0"
+            },
+            {
+              "id": "DEEP-2",
+              "task": "Click-flow YAML for page exploration — foreach/capture steps to click through tabs, panels, nodes. Closes #20. Plan: tasks/active/DEEP-2-click-flow.md",
+              "owner": "--",
+              "depends": [],
+              "status": "done",
+              "release": "v0.8.0"
             }
           ]
         }
