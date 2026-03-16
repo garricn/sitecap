@@ -314,7 +314,7 @@ if (values["auth-flow"]) {
   if (values["session-video"] && authPage.video()) {
     const authVideoPath = await authPage.video().path();
     await authPage.close();
-    try { await (await import("node:fs/promises")).unlink(authVideoPath); } catch {}
+    try { await (await import("node:fs/promises")).unlink(authVideoPath); } catch { /* video may not exist */ }
   } else {
     await authPage.close();
   }
@@ -343,7 +343,7 @@ if (values.explore) {
   if (values["session-video"] && explorePage.video()) {
     const exploreVideoPath = await explorePage.video().path();
     await explorePage.close();
-    try { await (await import("node:fs/promises")).unlink(exploreVideoPath); } catch {}
+    try { await (await import("node:fs/promises")).unlink(exploreVideoPath); } catch { /* video may not exist */ }
   } else {
     await explorePage.close();
   }
