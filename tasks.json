@@ -204,7 +204,7 @@
         },
         {
           "id": "AUTH-3",
-          "task": "Investigate API token auth — inject API keys as cookies/headers for machine-to-machine auth. No browser login needed. Test with GHL API.",
+          "task": "Investigate API token auth — inject API keys as cookies/headers for machine-to-machine auth. No browser login needed. Test with real SaaS apps.",
           "owner": "--",
           "depends": [],
           "status": "backlog",
