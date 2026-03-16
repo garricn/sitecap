@@ -175,6 +175,20 @@
       ]
     },
     {
+      "name": "Release",
+      "prefix": "REL",
+      "tasks": [
+        {
+          "id": "REL-1",
+          "task": "Open-source readiness — LICENSE, package.json metadata, .npmignore, CONTRIBUTING.md, CHANGELOG.md, SECURITY.md fix. Plan: tasks/active/rel-1-opensource-readiness-2026-03-16.md",
+          "owner": "--",
+          "depends": [],
+          "status": "pending",
+          "release": "v1.0.0"
+        }
+      ]
+    },
+    {
       "name": "Demo",
       "prefix": "DEMO",
       "tasks": [
