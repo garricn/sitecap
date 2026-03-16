@@ -1,0 +1,181 @@
+#!/usr/bin/env node
+
+/**
+ * Codegen orchestrator — reads operation registry, generates all API surfaces.
+ */
+
+import { writeFile, mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
+import { z } from "zod";
+import { allOperations } from "../lib/registry.js";
+
+const OUT = resolve(import.meta.dirname, "../generated");
+
+await mkdir(OUT, { recursive: true });
+
+function camelCase(str) {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+// ── MCP tools ────────────────────────────────────────────────────────────────
+
+function generateMcpTools() {
+  const toolDefs = allOperations.map((op) => {
+    const schema = z.toJSONSchema(op.input);
+    // MCP expects inputSchema with properties — strip $schema wrapper
+    delete schema.$schema;
+    return {
+      name: op.name,
+      description: op.description,
+      inputSchema: schema,
+    };
+  });
+
+  const imports = allOperations.map((op) => `${camelCase(op.name)}Op`).join(", ");
+
+  return `// AUTO-GENERATED — do not edit. Run: npm run generate
+import { ${imports} } from "../lib/operations.js";
+
+export const tools = ${JSON.stringify(toolDefs, null, 2)};
+
+const ops = { ${allOperations.map((op) => `${op.name}: ${camelCase(op.name)}Op`).join(", ")} };
+
+export async function handleTool(name, args) {
+  const op = ops[name];
+  if (!op) throw new Error(\`Unknown tool: \${name}\`);
+  return op.handler(op.input.parse(args));
+}
+`;
+}
+
+// ── REST API routes ──────────────────────────────────────────────────────────
+
+function generateApiRoutes() {
+  const imports = allOperations.map((op) => `${camelCase(op.name)}Op`).join(", ");
+
+  const routeDefs = allOperations.map((op) => {
+    const method = op.type === "mutation" ? "POST" : "GET";
+    const path = `/${op.name}`;
+    return `  { method: "${method}", path: "${path}", op: ${camelCase(op.name)}Op }`;
+  });
+
+  return `// AUTO-GENERATED — do not edit. Run: npm run generate
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { Buffer } from "node:buffer";
+import { ${imports} } from "../lib/operations.js";
+
+const pkg = JSON.parse(await readFile(resolve(import.meta.dirname, "../package.json"), "utf-8"));
+
+const routes = [
+${routeDefs.join(",\n")}
+];
+
+async function readBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString());
+}
+
+function respond(res, status, data) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(data));
+}
+
+export async function handleRequest(req, res) {
+  try {
+    const parsed = new URL(req.url, "http://localhost");
+    const pathname = parsed.pathname;
+
+    if (req.method === "GET" && pathname === "/health") {
+      return respond(res, 200, { ok: true, version: pkg.version });
+    }
+
+    const route = routes.find((r) => r.method === req.method && r.path === pathname);
+    if (!route) {
+      return respond(res, 404, {
+        error: "Not found. Endpoints: " + routes.map((r) => r.method + " " + r.path).join(", ") + ", GET /health",
+      });
+    }
+
+    let input;
+    if (req.method === "GET") {
+      input = Object.fromEntries(parsed.searchParams.entries());
+    } else {
+      input = await readBody(req);
+    }
+
+    const result = await route.op.handler(route.op.input.parse(input));
+    respond(res, 200, { ok: true, ...result });
+  } catch (e) {
+    respond(res, 500, { error: e.message });
+  }
+}
+`;
+}
+
+// ── OpenAPI spec ─────────────────────────────────────────────────────────────
+
+function generateOpenApi() {
+  const paths = {};
+
+  for (const op of allOperations) {
+    const method = op.type === "mutation" ? "post" : "get";
+    const path = `/${op.name}`;
+    const schema = z.toJSONSchema(op.input);
+
+    const operation = {
+      summary: op.description,
+      operationId: op.name,
+    };
+
+    if (method === "post") {
+      operation.requestBody = {
+        required: true,
+        content: { "application/json": { schema } },
+      };
+    } else {
+      operation.parameters = Object.entries(schema.properties || {}).map(([name, prop]) => ({
+        name,
+        in: "query",
+        required: (schema.required || []).includes(name),
+        schema: prop,
+      }));
+    }
+
+    operation.responses = {
+      200: { description: "Success", content: { "application/json": { schema: { type: "object" } } } },
+      500: { description: "Error", content: { "application/json": { schema: { type: "object", properties: { error: { type: "string" } } } } } },
+    };
+
+    paths[path] = { [method]: operation };
+  }
+
+  return {
+    openapi: "3.1.0",
+    info: { title: "sitecap API", version: "0.1.0" },
+    servers: [{ url: "http://localhost:3100" }],
+    paths,
+  };
+}
+
+// ── Function-calling tools ───────────────────────────────────────────────────
+
+function generateTools() {
+  return allOperations.map((op) => ({
+    name: `sitecap_${op.name}`,
+    description: op.description,
+    input_schema: z.toJSONSchema(op.input),
+  }));
+}
+
+// ── Write all files ──────────────────────────────────────────────────────────
+
+await Promise.all([
+  writeFile(resolve(OUT, "mcp-tools.js"), generateMcpTools()),
+  writeFile(resolve(OUT, "api-routes.js"), generateApiRoutes()),
+  writeFile(resolve(OUT, "openapi.json"), JSON.stringify(generateOpenApi(), null, 2) + "\n"),
+  writeFile(resolve(OUT, "tools.json"), JSON.stringify(generateTools(), null, 2) + "\n"),
+]);
+
+console.log("Generated: mcp-tools.js, api-routes.js, openapi.json, tools.json");
