@@ -354,7 +354,7 @@ async function worker() {
         viewport,
         recordVideo: { dir: pageDir },
       });
-      if (values.auth) {
+      if (values.auth || values["auth-flow"]) {
         const cookies = await context.cookies();
         if (cookies.length > 0) await videoCtx.addCookies(cookies);
       }
