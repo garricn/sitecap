@@ -1,0 +1,270 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "sitecap API",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3100"
+    }
+  ],
+  "paths": {
+    "/capture": {
+      "post": {
+        "summary": "Capture a web page — screenshot, accessibility tree, HTML, network, console, storage, performance",
+        "operationId": "capture",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "URL to capture"
+                  },
+                  "output": {
+                    "default": "/tmp/sitecap",
+                    "description": "Output directory",
+                    "type": "string"
+                  },
+                  "types": {
+                    "description": "Comma-separated capture types",
+                    "type": "string"
+                  },
+                  "viewport": {
+                    "default": "1280x720",
+                    "description": "Viewport WxH",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "output",
+                  "viewport"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diff": {
+      "get": {
+        "summary": "Compare two sitecap capture directories",
+        "operationId": "diff",
+        "parameters": [
+          {
+            "name": "dirA",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Path to first capture directory"
+            }
+          },
+          {
+            "name": "dirB",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Path to second capture directory"
+            }
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "Screenshot diff threshold % (default: 0.1)",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl": {
+      "post": {
+        "summary": "Crawl a site and capture all same-origin pages",
+        "operationId": "crawl",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Seed URL to crawl from"
+                  },
+                  "output": {
+                    "default": "/tmp/sitecap",
+                    "description": "Output directory",
+                    "type": "string"
+                  },
+                  "maxDepth": {
+                    "default": 3,
+                    "description": "Max crawl depth",
+                    "type": "number"
+                  },
+                  "maxPages": {
+                    "default": 50,
+                    "description": "Max pages to capture",
+                    "type": "number"
+                  },
+                  "filter": {
+                    "description": "Regex to include URLs",
+                    "type": "string"
+                  },
+                  "exclude": {
+                    "description": "Regex to exclude URLs",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "output",
+                  "maxDepth",
+                  "maxPages"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/read_capture": {
+      "get": {
+        "summary": "Read a specific file from a sitecap capture directory",
+        "operationId": "read_capture",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Path to the capture file"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
