@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
-import { createInterface } from "node:readline";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
@@ -81,6 +80,7 @@ const { values, positionals } = parseArgs({
     auth: { type: "string" },
     "wait-for-auth": { type: "boolean", default: false },
     "auth-url": { type: "string" },
+    "auth-flow": { type: "string" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -112,6 +112,7 @@ Options:
   --auth <file>            Load cookies/storage from JSON before capture
   --wait-for-auth          Launch Chrome, wait for user to log in, then capture
   --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
+  --auth-flow <file>       Run auth flow from YAML before capture (e.g., login steps)
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -192,13 +193,17 @@ if (values["wait-for-auth"] && !values.profile) {
   console.error("--wait-for-auth requires --profile (need a visible browser to log in)");
   process.exit(1);
 }
+if (values["auth-flow"] && !values.profile && !values.launch) {
+  console.error("--auth-flow requires --profile or --launch (need a browser to run auth steps)");
+  process.exit(1);
+}
 
 // Connect or launch Chrome
 let browser;
 let profileContext = null;
 
 if (values.profile) {
-  // Launch Chrome with a real profile via Playwright persistent context
+  // Launch Chrome with profile via Playwright persistent context
   const userDataDir = values["user-data-dir"] || findUserDataDir();
   const profileDir = await resolveProfileDir(userDataDir, values.profile);
   console.log(`Launching Chrome with profile "${values.profile}" (dir: ${profileDir})...`);
@@ -218,14 +223,24 @@ if (values.profile) {
 
   // Wait for user to authenticate if requested
   if (values["wait-for-auth"]) {
-    if (values["auth-url"]) {
-      const authPage = await profileContext.newPage();
-      await authPage.goto(values["auth-url"], { waitUntil: "domcontentloaded", timeout: 30_000 });
-      console.log(`Navigated to ${values["auth-url"]}`);
-    }
-    console.log("\nLog in, then press Enter to continue...");
-    const rl = createInterface({ input: process.stdin });
-    await new Promise((resolve) => rl.once("line", () => { rl.close(); resolve(); }));
+    const authPage = await profileContext.newPage();
+    const authUrl = values["auth-url"] || targets[0].url;
+    await authPage.goto(authUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const loginUrl = authPage.url();
+    console.log(`Navigated to ${loginUrl}`);
+    console.log("Waiting for auth (complete login in Chrome, URL change will be detected)...");
+
+    // Poll for URL change — non-interactive, detects when login redirects
+    await authPage.waitForURL((url) => url.href !== loginUrl, { timeout: 120_000 });
+    console.log(`Auth detected: ${authPage.url()}`);
+
+    // Save cookies for future runs
+    const { saveGoogleAuthCookies } = await import("../lib/auth.js");
+    const userDataDirForSave = values["user-data-dir"] || findUserDataDir();
+    const profileDirForSave = await resolveProfileDir(userDataDirForSave, values.profile);
+    await saveGoogleAuthCookies(profileContext, profileDirForSave);
+
+    await authPage.close();
     console.log("Continuing with capture...");
   }
 } else {
@@ -239,8 +254,9 @@ if (values.profile) {
     } else {
       console.error(
         `Failed to connect to Chrome on port ${port}.\n` +
-          `Use --launch to auto-start headless Chrome, or start Chrome manually:\n` +
-          `  google-chrome --remote-debugging-port=${port}\n`
+          `Use --launch for headless, --profile for your Chrome profile, or start Chrome manually:\n` +
+          `  google-chrome --remote-debugging-port=${port} --user-data-dir=/tmp/chrome-debug\n` +
+          `  (Chrome 136+ requires --user-data-dir with --remote-debugging-port)\n`
       );
       process.exit(1);
     }
@@ -260,6 +276,26 @@ if (values.auth) {
     // localStorage must be injected per-page after navigation, store for later
     context.__sitecapLocalStorage = authData.localStorage;
   }
+}
+
+// Run auth flow if provided
+if (values["auth-flow"]) {
+  const { runAuthFlow } = await import("../lib/auth.js");
+  const authPage = await context.newPage();
+  await authPage.setViewportSize(viewport);
+
+  // Navigate to first target URL as starting point
+  const authTarget = targets[0].url;
+  await authPage.goto(authTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
+
+  const success = await runAuthFlow(resolve(values["auth-flow"]), authPage, context);
+
+  if (success) {
+    console.log("Auth flow completed.");
+  } else {
+    console.log("Auth flow did not complete — proceeding without auth.");
+  }
+  await authPage.close();
 }
 
 // BFS crawl queue: { url, slug, depth }
@@ -364,8 +400,6 @@ if (profileContext) {
     await shutdownChrome(profileContext);
     console.log("Chrome closed.");
   } else {
-    // Detach without closing — leave Chrome open for the user
-    // Playwright persistent contexts can't truly detach, so we close
     await shutdownChrome(profileContext);
     console.log("Chrome closed (persistent contexts cannot stay open after Playwright exits).");
   }

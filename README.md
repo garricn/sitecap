@@ -14,37 +14,43 @@ npm install
 node bin/sitecap.js https://example.com --launch -o ./output
 ```
 
-### Authenticated sites (use your real Chrome sessions)
+### Authenticated sites
 
-1. Launch Chrome with remote debugging (your profiles and logins stay intact):
+**Step 1 — One-time login (saves cookies):**
 
 ```bash
-# macOS
-open -a "Google Chrome" --args --remote-debugging-port=9222
-
-# Linux
-google-chrome --remote-debugging-port=9222
+node bin/sitecap.js https://your-app.com/dashboard --profile Default --wait-for-auth
+# Chrome opens → log in however you need to (Google, email/password, 2FA, etc.)
+# sitecap detects the redirect and saves session cookies to ~/.sitecap/auth/
 ```
 
-2. Browse normally — you're signed in everywhere as usual.
-
-3. Capture:
+**Step 2 — Every subsequent run (headless, no browser window):**
 
 ```bash
-node bin/sitecap.js https://your-app.com/dashboard -o ./output
+node bin/sitecap.js https://your-app.com/dashboard --launch --auth ~/.sitecap/auth/google-default.json -o ./output
 ```
 
-sitecap connects to your Chrome and inherits all cookies, auth state, and sessions.
+No Chrome profile needed. No modal. Fully automated.
 
-### CI with auth
+### Auth flows (advanced)
 
-Export cookies from a local session, then reuse in CI:
+For complex login sequences, define steps in YAML:
+
+```yaml
+# auth/my-app.yaml
+name: my-app-login
+steps:
+  - cookies: restore
+  - wait: settle
+  - fill: { selector: "#email", value: "$LOGIN_EMAIL" }
+  - fill: { selector: "#password", value: "$LOGIN_PASSWORD" }
+  - click: "button[type='submit']"
+  - wait: redirect
+  - cookies: save
+```
 
 ```bash
-# Local: capture storage from an authenticated session
-node bin/sitecap.js https://your-app.com -o ./auth-capture
-# Use the captured storage.json as auth input
-node bin/sitecap.js https://your-app.com --launch --auth ./auth-capture/your-app.com/storage.json -o ./output
+node bin/sitecap.js https://your-app.com --profile Default --auth-flow auth/my-app.yaml -o ./output
 ```
 
 ## Capture Types
