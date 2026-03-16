@@ -1,9 +1,10 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { startTestServer } from "./helpers/server.js";
 
 const exec = promisify(execFile);
 const CLI = "node";
@@ -11,7 +12,15 @@ const BIN = join(import.meta.dirname, "..", "bin", "sitecap.js");
 const TEST_DIR = "/tmp/sitecap-test-cli";
 
 describe("CLI", () => {
+  let server, baseUrl;
+
+  beforeAll(async () => {
+    server = await startTestServer();
+    baseUrl = server.url;
+  });
+
   afterAll(async () => {
+    await server.close();
     await rm(TEST_DIR, { recursive: true, force: true });
   });
 
@@ -40,26 +49,26 @@ describe("CLI", () => {
   describe("capture", () => {
     it("captures a page with --launch", async () => {
       const outDir = join(TEST_DIR, "capture");
-      const { stdout } = await exec(CLI, [BIN, "https://example.com", "--launch", "-o", outDir], {
+      const { stdout } = await exec(CLI, [BIN, baseUrl, "--launch", "-o", outDir], {
         timeout: 30_000,
       });
       expect(stdout).toContain("1 captured, 0 failed");
-      expect(existsSync(join(outDir, "example.com", "screenshot.png"))).toBe(true);
-      expect(existsSync(join(outDir, "example.com", "meta.json"))).toBe(true);
+      expect(existsSync(join(outDir, "127.0.0.1", "screenshot.png"))).toBe(true);
+      expect(existsSync(join(outDir, "127.0.0.1", "meta.json"))).toBe(true);
     }, 30_000);
 
     it("captures selective types", async () => {
       const outDir = join(TEST_DIR, "selective");
-      await exec(CLI, [BIN, "https://example.com", "--launch", "-o", outDir, "-t", "html,screenshot"], {
+      await exec(CLI, [BIN, baseUrl, "--launch", "-o", outDir, "-t", "html,screenshot"], {
         timeout: 30_000,
       });
-      expect(existsSync(join(outDir, "example.com", "screenshot.png"))).toBe(true);
-      expect(existsSync(join(outDir, "example.com", "page-source.html"))).toBe(true);
+      expect(existsSync(join(outDir, "127.0.0.1", "screenshot.png"))).toBe(true);
+      expect(existsSync(join(outDir, "127.0.0.1", "page-source.html"))).toBe(true);
     }, 30_000);
 
     it("uses correct viewport", async () => {
       const outDir = join(TEST_DIR, "viewport");
-      const { stdout } = await exec(CLI, [BIN, "https://example.com", "--launch", "-o", outDir, "-v", "800x600"], {
+      const { stdout } = await exec(CLI, [BIN, baseUrl, "--launch", "-o", outDir, "-v", "800x600"], {
         timeout: 30_000,
       });
       expect(stdout).toContain("800x600");
@@ -69,7 +78,7 @@ describe("CLI", () => {
   describe("validation", () => {
     it("rejects invalid viewport format", async () => {
       try {
-        await exec(CLI, [BIN, "https://example.com", "--launch", "-v", "invalid"]);
+        await exec(CLI, [BIN, baseUrl, "--launch", "-v", "invalid"]);
         expect.unreachable();
       } catch (e) {
         expect(e.stderr).toContain("Invalid viewport format");
@@ -78,7 +87,7 @@ describe("CLI", () => {
 
     it("rejects --wait-for-auth without --profile", async () => {
       try {
-        await exec(CLI, [BIN, "https://example.com", "--wait-for-auth"]);
+        await exec(CLI, [BIN, baseUrl, "--wait-for-auth"]);
         expect.unreachable();
       } catch (e) {
         expect(e.stderr).toContain("requires --profile");
@@ -91,18 +100,17 @@ describe("CLI", () => {
       const outA = join(TEST_DIR, "diff-a");
       const outB = join(TEST_DIR, "diff-b");
 
-      await exec(CLI, [BIN, "https://example.com", "--launch", "-o", outA], { timeout: 30_000 });
-      await exec(CLI, [BIN, "https://example.com", "--launch", "-o", outB], { timeout: 30_000 });
+      await exec(CLI, [BIN, baseUrl, "--launch", "-o", outA], { timeout: 30_000 });
+      await exec(CLI, [BIN, baseUrl, "--launch", "-o", outB], { timeout: 30_000 });
 
-      const { stdout } = await exec(CLI, [BIN, "diff", join(outA, "example.com"), join(outB, "example.com")]);
+      const { stdout } = await exec(CLI, [BIN, "diff", join(outA, "127.0.0.1"), join(outB, "127.0.0.1")]);
       expect(stdout).toContain("identical");
     }, 60_000);
 
-    it("exits 0 for identical, 1 for different", async () => {
-      const outA = join(TEST_DIR, "diff-a", "example.com");
-      const outB = join(TEST_DIR, "diff-b", "example.com");
+    it("exits 0 for identical", async () => {
+      const outA = join(TEST_DIR, "diff-a", "127.0.0.1");
+      const outB = join(TEST_DIR, "diff-b", "127.0.0.1");
 
-      // Identical — exit 0
       const { stdout } = await exec(CLI, [BIN, "diff", outA, outB]);
       expect(stdout).toContain("0 changed");
     }, 10_000);
