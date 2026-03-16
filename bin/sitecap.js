@@ -310,7 +310,14 @@ if (values["auth-flow"]) {
   } else {
     console.log("Auth flow did not complete — proceeding without auth.");
   }
-  await authPage.close();
+  // Delete auth page's video artifact — session video should only come from the capture page
+  if (values["session-video"] && authPage.video()) {
+    const authVideoPath = await authPage.video().path();
+    await authPage.close();
+    try { await (await import("node:fs/promises")).unlink(authVideoPath); } catch {}
+  } else {
+    await authPage.close();
+  }
 }
 
 // Run exploration flow if provided
@@ -333,7 +340,13 @@ if (values.explore) {
   } else {
     console.log("Exploration flow did not complete.");
   }
-  await explorePage.close();
+  if (values["session-video"] && explorePage.video()) {
+    const exploreVideoPath = await explorePage.video().path();
+    await explorePage.close();
+    try { await (await import("node:fs/promises")).unlink(exploreVideoPath); } catch {}
+  } else {
+    await explorePage.close();
+  }
 }
 
 // BFS crawl queue: { url, slug, depth }
@@ -422,7 +435,7 @@ async function worker() {
     }
   }
 
-  if (page) await page.close();
+  if (page && !values["session-video"]) await page.close();
 }
 
 // Launch workers up to concurrency limit (or target count if fewer)
