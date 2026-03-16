@@ -223,7 +223,7 @@
           "task": "Investigate email/password bot accounts — dedicated bot user per site, auth via --auth-flow YAML (fill email/password, submit). No OAuth dependency.",
           "owner": "--",
           "depends": [],
-          "status": "backlog",
+          "status": "done",
           "release": "--"
         }
       ]
