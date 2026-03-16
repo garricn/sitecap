@@ -1,0 +1,31 @@
+# Google OAuth auth flow for sitecap
+# Usage: sitecap https://app.example.com --profile Default --auth-flow examples/google-oauth.yaml
+#
+# Customize the selectors below to match your app's login page.
+# Run with --wait-for-auth first to save cookies, then use this flow.
+
+name: google-oauth
+
+steps:
+  # Restore cookies from a previous login (skips OAuth if session is valid)
+  - cookies: restore
+    optional: true
+
+  # Wait for the login page to fully load
+  - wait: settle
+
+  # Click the Google sign-in button (customize this selector for your app)
+  - click: "button:has-text('Sign in with Google')"
+    optional: true
+
+  # Wait for Google account chooser popup
+  - wait: popup
+
+  # Click the account (customize the email for your Google account)
+  - click: "[data-identifier='user@example.com']"
+
+  # Wait for redirect back to the app
+  - wait: redirect
+
+  # Save cookies so next run skips the OAuth flow
+  - cookies: save

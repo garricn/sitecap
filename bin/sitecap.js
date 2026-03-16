@@ -81,7 +81,7 @@ const { values, positionals } = parseArgs({
     auth: { type: "string" },
     "wait-for-auth": { type: "boolean", default: false },
     "auth-url": { type: "string" },
-    "auto-auth": { type: "string" },
+    "auth-flow": { type: "string" },
     video: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -113,7 +113,7 @@ Options:
   --auth <file>            Load cookies/storage from JSON before capture
   --wait-for-auth          Launch Chrome, wait for user to log in, then capture
   --auth-url <url>         Navigate to this URL before waiting (use with --wait-for-auth)
-  --auto-auth <provider>   Automate OAuth login (e.g., google). Requires --profile
+  --auth-flow <file>       Run auth flow from YAML before capture (e.g., login steps)
   --video                  Record page video (off by default)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -194,8 +194,8 @@ if (values["wait-for-auth"] && !values.profile) {
   console.error("--wait-for-auth requires --profile (need a visible browser to log in)");
   process.exit(1);
 }
-if (values["auto-auth"] && !values.profile) {
-  console.error("--auto-auth requires --profile (need a Chrome session with a logged-in account)");
+if (values["auth-flow"] && !values.profile && !values.launch) {
+  console.error("--auth-flow requires --profile or --launch (need a browser to run auth steps)");
   process.exit(1);
 }
 
@@ -275,27 +275,22 @@ if (values.auth) {
   }
 }
 
-// Auto-auth: navigate to first URL, perform OAuth, then proceed
-if (values["auto-auth"]) {
-  const { autoAuth } = await import("../lib/auth.js");
+// Run auth flow if provided
+if (values["auth-flow"]) {
+  const { runAuthFlow } = await import("../lib/auth.js");
   const authPage = await context.newPage();
   await authPage.setViewportSize(viewport);
+
+  // Navigate to first target URL as starting point
   const authTarget = targets[0].url;
-  console.log(`Auto-auth (${values["auto-auth"]}): navigating to ${authTarget}...`);
   await authPage.goto(authTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-  const userDataDir = values["user-data-dir"] || findUserDataDir();
-  const profileDir = values.profile ? await resolveProfileDir(userDataDir, values.profile) : null;
-
-  const success = await autoAuth(values["auto-auth"], authPage, context, {
-    profileDir,
-    userDataDir,
-  });
+  const success = await runAuthFlow(resolve(values["auth-flow"]), authPage, context);
 
   if (success) {
-    console.log("Auto-auth succeeded.");
+    console.log("Auth flow completed.");
   } else {
-    console.log("Auto-auth did not complete — proceeding without auth.");
+    console.log("Auth flow did not complete — proceeding without auth.");
   }
   await authPage.close();
 }
