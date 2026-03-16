@@ -85,6 +85,15 @@ describe("CLI", () => {
       }
     });
 
+    it("rejects --video --session-video together", async () => {
+      try {
+        await exec(CLI, [BIN, baseUrl, "--launch", "--video", "--session-video"]);
+        expect.unreachable();
+      } catch (e) {
+        expect(e.stderr).toContain("mutually exclusive");
+      }
+    });
+
     it("rejects --wait-for-auth without --profile", async () => {
       try {
         await exec(CLI, [BIN, baseUrl, "--wait-for-auth"]);
