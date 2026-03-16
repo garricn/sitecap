@@ -129,6 +129,20 @@
           ]
         },
         {
+          "id": "CORE-W5",
+          "parallelism": "SRL",
+          "tasks": [
+            {
+              "id": "CORE-12",
+              "task": "Session video: continuous recording across full capture run + createSession() API for sitetest. Closes #26. Plan: tasks/active/core-12-session-video-2026-03-16.md",
+              "owner": "--",
+              "depends": ["CORE-11"],
+              "status": "done",
+              "release": "v0.9.0"
+            }
+          ]
+        },
+        {
           "id": "CORE-W4",
           "parallelism": "PARA",
           "tasks": [

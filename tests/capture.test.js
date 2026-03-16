@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { capturePage, navigateAndCapture, extractLinks, waitForPageSettle } from "../lib/capture.js";
+import { createCaptureSession, closeCaptureSession } from "../lib/browser.js";
 import { startTestServer } from "./helpers/server.js";
 
 const TEST_DIR = "/tmp/sitecap-test-capture";
@@ -171,6 +172,32 @@ describe("capture", () => {
         expect(link).not.toContain("#");
       }
     });
+  });
+
+  describe("createCaptureSession", () => {
+    it("produces session-video.webm when video enabled", async () => {
+      const outDir = join(TEST_DIR, "session-video");
+      const session = await createCaptureSession(browser, { width: 1280, height: 720 }, {
+        video: true,
+        videoDir: outDir,
+      });
+      await navigateAndCapture(session.page, baseUrl, join(outDir, "page1"), { types: ["html"] });
+      const result = await closeCaptureSession(session);
+      expect(result.videoPath).toContain("session-video.webm");
+      expect(existsSync(join(outDir, "session-video.webm"))).toBe(true);
+    }, 30_000);
+
+    it("produces no video when video disabled", async () => {
+      const outDir = join(TEST_DIR, "no-session-video");
+      const session = await createCaptureSession(browser, { width: 1280, height: 720 }, {
+        video: false,
+        videoDir: outDir,
+      });
+      await navigateAndCapture(session.page, baseUrl, join(outDir, "page1"), { types: ["html"] });
+      const result = await closeCaptureSession(session);
+      expect(result.videoPath).toBeNull();
+      expect(existsSync(join(outDir, "session-video.webm"))).toBe(false);
+    }, 30_000);
   });
 
   describe("waitForPageSettle", () => {
