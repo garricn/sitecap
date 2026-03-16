@@ -254,8 +254,9 @@ if (values.profile) {
     } else {
       console.error(
         `Failed to connect to Chrome on port ${port}.\n` +
-          `Use --launch to auto-start headless Chrome, or start Chrome manually:\n` +
-          `  google-chrome --remote-debugging-port=${port}\n`
+          `Use --launch for headless, --profile for your Chrome profile, or start Chrome manually:\n` +
+          `  google-chrome --remote-debugging-port=${port} --user-data-dir=/tmp/chrome-debug\n` +
+          `  (Chrome 136+ requires --user-data-dir with --remote-debugging-port)\n`
       );
       process.exit(1);
     }
