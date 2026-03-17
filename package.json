@@ -1,23 +1,33 @@
 {
   "name": "sitecap",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Exhaustive web page capture — screenshot, accessibility tree, HTML source, network requests, console logs, storage state.",
   "type": "module",
   "main": "./index.js",
   "exports": {
     ".": "./index.js",
+    "./browser": "./lib/browser.js",
     "./capture": "./lib/capture.js",
     "./diff": "./lib/diff.js"
   },
   "bin": {
     "sitecap": "./bin/sitecap.js"
   },
+  "files": [
+    "bin/",
+    "lib/",
+    "generated/",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node bin/sitecap.js",
     "mcp": "node bin/mcp-server.js",
     "api": "node bin/api-server.js",
     "test": "vitest run",
-    "generate": "node scripts/generate.js"
+    "generate": "node scripts/generate.js",
+    "prepublishOnly": "npm run generate"
   },
   "keywords": [
     "capture",
@@ -26,8 +36,16 @@
     "accessibility",
     "web"
   ],
-  "author": "",
+  "author": "Garric Nahapetian",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/garricn/sitecap.git"
+  },
+  "homepage": "https://github.com/garricn/sitecap",
+  "bugs": {
+    "url": "https://github.com/garricn/sitecap/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "js-yaml": "^4.1.1",
