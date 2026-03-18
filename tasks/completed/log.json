@@ -11,5 +11,23 @@
     "task": "Deduplicate shared assets across pages — single assets/ dir at site root with content-hash filenames",
     "status": "done",
     "date": "2026-03-17"
+  },
+  {
+    "id": "CMS-6",
+    "task": "Remove 100-resource cap on MODX TV value extraction — fetch TV values for all resources regardless of count",
+    "status": "done",
+    "date": "2026-03-18"
+  },
+  {
+    "id": "CMS-7",
+    "task": "Parse MODx.load() blocks from resource edit HTML for image/file TV values",
+    "status": "done",
+    "date": "2026-03-18"
+  },
+  {
+    "id": "CMS-10",
+    "task": "WordPress equivalent — extract ACF image/file field values and resolve attachment IDs via /wp-json/wp/v2/media",
+    "status": "done",
+    "date": "2026-03-18"
   }
 ]
