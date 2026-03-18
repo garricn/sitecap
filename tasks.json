@@ -401,14 +401,6 @@
           "parallelism": "PARA",
           "tasks": [
             {
-              "id": "CMS-8",
-              "task": "Discover CMS media source base paths and download source uploads — use MODX Browser/Directory/GetList or WP media API to find actual file storage, download originals",
-              "owner": "--",
-              "depends": ["CMS-7"],
-              "status": "in-progress",
-              "release": "--"
-            },
-            {
               "id": "CMS-9",
               "task": "Cross-reference TV file refs vs downloaded assets — produce coverage report showing which image/file TVs have local copies and which are missing",
               "owner": "--",
