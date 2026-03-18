@@ -29,5 +29,11 @@
     "task": "WordPress equivalent — extract ACF image/file field values and resolve attachment IDs via /wp-json/wp/v2/media",
     "status": "done",
     "date": "2026-03-18"
+  },
+  {
+    "id": "ASSET-3",
+    "task": "Add cli.test.js coverage for --download-assets --crawl shared assets wiring",
+    "status": "done",
+    "date": "2026-03-18"
   }
 ]
