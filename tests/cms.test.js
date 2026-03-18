@@ -44,6 +44,15 @@ describe("CMS detection", () => {
       expect(result.detected).toBe(true);
       expect(result.cms).toBe("modx");
       expect(result.indicators.length).toBeGreaterThanOrEqual(1);
+      expect(result.admin).toBe(false);
+    });
+
+    it("detects MODX admin session via site_id", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const result = await detectCms(page, []);
+      expect(result.detected).toBe(true);
+      expect(result.cms).toBe("modx");
+      expect(result.admin).toBe(true);
     });
 
     it("detects Drupal", async () => {
@@ -53,6 +62,7 @@ describe("CMS detection", () => {
       expect(result.cms).toBe("drupal");
       expect(result.version).toBe("10");
       expect(result.indicators.length).toBeGreaterThanOrEqual(2);
+      expect(result.admin).toBe(false);
     });
 
     it("returns not detected on plain page", async () => {

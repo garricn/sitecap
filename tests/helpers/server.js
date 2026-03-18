@@ -45,6 +45,11 @@ export async function startTestServer() {
 <html><head><meta charset="utf-8"><title>MODX</title></head>
 <body><h1>MODX Site</h1>
 <script>window.MODx = { config: {} };</script></body></html>`);
+    } else if (req.url === "/modx-admin") {
+      res.end(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>MODX Manager</title></head>
+<body><h1>MODX Manager</h1>
+<script>window.MODx = { config: { site_id: "abc123" } };</script></body></html>`);
     } else if (req.url === "/drupal") {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="generator" content="Drupal 10"><title>Drupal</title></head>

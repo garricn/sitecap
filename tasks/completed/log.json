@@ -1,0 +1,9 @@
+[
+  {
+    "id": "ECO-1",
+    "task": "sitegrade --browser integration: generate manifest from crawl URLs, run sitecap, feed rendered DOM + captures into analyzers",
+    "status": "moved",
+    "note": "Moved to sitegrade tasks.json as BRO-1 — belongs in the consuming project, not sitecap",
+    "date": "2026-03-17"
+  }
+]
