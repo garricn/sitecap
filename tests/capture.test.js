@@ -202,7 +202,7 @@ describe("capture", () => {
   });
 
   describe("downloadAssets", () => {
-    it("downloads assets and creates manifest", async () => {
+    it("downloads assets, creates manifest, and rewrites URLs", async () => {
       const outDir = join(TEST_DIR, "assets-test");
       await navigateAndCapture(page, baseUrl, outDir, { downloadAssets: true });
       expect(existsSync(join(outDir, "assets"))).toBe(true);
@@ -211,15 +211,13 @@ describe("capture", () => {
       const urls = Object.keys(manifest);
       expect(urls.some((u) => u.includes("style.css"))).toBe(true);
       expect(urls.some((u) => u.includes("script.js"))).toBe(true);
-    }, 30_000);
-
-    it("creates page-source-local.html with rewritten URLs", async () => {
-      const outDir = join(TEST_DIR, "assets-test");
+      expect(urls.some((u) => u.includes("image.png"))).toBe(true);
+      // Verify page-source-local.html has rewritten URLs
       expect(existsSync(join(outDir, "page-source-local.html"))).toBe(true);
       const html = await readFile(join(outDir, "page-source-local.html"), "utf-8");
       expect(html).toContain("assets/");
-      expect(html).not.toContain("/style.css");
-    });
+      expect(html).not.toContain('"/style.css"');
+    }, 30_000);
 
     it("does NOT create assets/ without flag", async () => {
       const outDir = join(TEST_DIR, "no-assets");

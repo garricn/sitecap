@@ -10,6 +10,7 @@ const HTML = `<!DOCTYPE html>
   <a href="/about">About</a>
   <a href="/contact">Contact</a>
   <a href="https://external.example.com">External Link</a>
+  <img src="/image.png" alt="Test">
   <script src="/script.js"></script>
 </body>
 </html>`;
@@ -40,6 +41,10 @@ export async function startTestServer() {
     } else if (req.url === "/script.js") {
       res.setHeader("Content-Type", "application/javascript");
       res.end("console.log('hello');");
+    } else if (req.url === "/image.png") {
+      res.setHeader("Content-Type", "image/png");
+      // 1x1 red PNG
+      res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
     } else if (req.url === "/api/data") {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message: "hello" }));
