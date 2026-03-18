@@ -41,5 +41,11 @@
     "task": "Discover CMS media source base paths and download source uploads via MODX Browser/Directory + WP media API",
     "status": "done",
     "date": "2026-03-18"
+  },
+  {
+    "id": "CMS-9",
+    "task": "Cross-reference TV file refs vs downloaded assets — coverage report",
+    "status": "done",
+    "date": "2026-03-18"
   }
 ]
