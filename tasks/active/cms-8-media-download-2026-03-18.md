@@ -28,25 +28,29 @@ The default media source (id=1) is typically the `assets/` directory. Sites can 
 
 ### Discovery via connectors
 
+**Important**: The existing `fetchConnector()` in `modx.js` cannot be reused for source/browser actions — its 2.x fallback hardcodes `element/${type}.php` paths. CMS-8 must add a new `fetchModxConnector(page, connectorsUrl, siteId, action, fallback2xPath)` helper that accepts an explicit 2.x fallback path, or add dedicated fetch functions for source/browser endpoints.
+
 **Step 1: List media sources**
-- POST to `{connectorsUrl}index.php` with `action=source/getlist&HTTP_MODAUTH={siteId}`
-- Falls back to 2.x: POST to `{connectorsUrl}source/index.php` with `action=getList`
+- 3.x: POST to `{connectorsUrl}index.php` with `action=source/getlist&HTTP_MODAUTH={siteId}`
+- 2.x fallback: POST to `{connectorsUrl}source/index.php` with `action=getList&HTTP_MODAUTH={siteId}`
 - Response: `{success: true, results: [{id: 1, name: "Filesystem", ...}]}`
 
 **Step 2: Get media source properties (basePath, baseUrl)**
-- POST with `action=source/get&id={sourceId}` for each source
+- 3.x: POST with `action=source/get&id={sourceId}`
+- 2.x fallback: POST to `{connectorsUrl}source/index.php` with `action=get&id={sourceId}`
 - Response includes `properties` object with `basePath` and `baseUrl` entries
 - Some media sources use `{base_path}` and `{base_url}` MODX path placeholders — resolve these relative to site root
 
 **Step 3: List files in each media source**
-- POST with `action=browser/directory/getlist&source={sourceId}&dir=/`
+- 3.x: POST with `action=browser/directory/getlist&source={sourceId}&dir=/`
+- 2.x fallback: POST to `{connectorsUrl}browser/directory.php` with `action=getList&source={sourceId}&dir=/`
 - Response: flat list of files and directories
 - Recursively list subdirectories by re-calling with `dir=/subdir/`
 - Each file entry includes: `name`, `pathname`, `size`, `mime` (or `type`)
 
 **Step 4: Download files**
 - Construct download URL: `{baseUrl}{pathname}` (relative to site root)
-- Fetch via `page.evaluate(fetch(url))` through the authenticated session
+- Fetch via authenticated `page.evaluate` using the same pattern as `resolveAcfMedia` (async IIFE with `fetch()`, `credentials: "include"`)
 - Save to `cms-media/{sourceId}/{pathname}` preserving directory structure
 
 ### MODX download scope
@@ -137,6 +141,17 @@ output/
 
 The `referencedBy` array links each file to the TV/ACF fields that reference it — enabling CMS-9's cross-reference report.
 
+### `referencedBy` format
+
+Each string follows the pattern: `{contentType}:{contentId}:{fieldName}`
+
+| CMS | contentType | contentId | fieldName | Example |
+|-----|------------|-----------|-----------|---------|
+| MODX | `resource` | resource ID | TV name | `resource:5:hero_image` |
+| WordPress | post type (`post`, `page`) | post/page ID | ACF field key | `post:1:hero_image` |
+
+For nested ACF fields (repeaters), use dot notation: `post:1:gallery.0.image`. CMS-9 will consume this format for cross-referencing.
+
 ---
 
 ## Files to modify
@@ -145,8 +160,8 @@ The `referencedBy` array links each file to the TV/ACF fields that reference it 
 - **`lib/cms/media.js`** — media discovery and download logic for both adapters. Exports `downloadCmsMedia(page, cmsStructure, cmsDetection, outDir, opts)`.
 
 ### Modified files
-- **`lib/cms/modx.js`** — export a helper `listModxMediaSources(page, connectorsUrl, siteId)` that CMS-8 calls. No changes to extraction logic itself.
-- **`lib/cms/wordpress.js`** — export a helper `collectWpMediaUrls(cmsStructure)` that walks resolved ACF fields and returns deduped media objects. No changes to extraction logic itself.
+- **`lib/cms/modx.js`** — add and export `fetchModxSource(page, connectorsUrl, siteId, action, fallback2xPath)` as a generic connector fetch that accepts explicit 2.x fallback paths (unlike `fetchConnector` which hardcodes `element/`). Also export `listModxMediaSources(page, connectorsUrl, siteId)` that uses it. Note: `fetchConnector` is not exported and should not be — the new helper is the public API for non-element connector actions.
+- **`lib/cms/wordpress.js`** — export a helper `collectWpMediaUrls(cmsStructure)` that walks resolved ACF fields and returns deduped media objects. **Assumption**: `cms.json` preserves the resolved ACF objects (rich `{id, url, mime, ...}` shapes) because `extractWordPress` returns the mutated `result` object which is then serialized to JSON. This is confirmed by the existing test at `cms.test.js:116` which asserts `hero.url` is a string. No changes to extraction logic itself.
 - **`lib/capture.js`** — after CMS structure extraction, call `downloadCmsMedia()` when `cms` type is active and `downloadMedia` option is set. Add `downloadMedia` to capture opts.
 - **`tests/helpers/server.js`** — add mock routes for MODX `source/getlist`, `source/get`, `browser/directory/getlist`, and downloadable file endpoints. Add WP media file download endpoint.
 - **`tests/cms.test.js`** — new `describe("CMS media download")` block with tests for both adapters.
@@ -217,7 +232,12 @@ assert manifest.stats.errors === 0
 **WordPress file download:**
 ```
 assert existsSync(join(outDir, "cms-media/wp/123-hero.jpg"))
-assert manifest.files[0].referencedBy includes "post:1:hero_image"
+assert manifest.files[0].referencedBy.includes("post:1:hero_image")
+```
+
+**referencedBy format:**
+```
+assert referencedBy string matches /^(resource|post|page):\d+:\w+(\.\w+)*$/
 ```
 
 **Opt-in behavior:**
