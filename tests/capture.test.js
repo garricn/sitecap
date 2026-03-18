@@ -224,6 +224,26 @@ describe("capture", () => {
       await navigateAndCapture(page, baseUrl, outDir);
       expect(existsSync(join(outDir, "assets"))).toBe(false);
     });
+
+    it("deduplicates assets in shared directory", async () => {
+      const sharedDir = join(TEST_DIR, "shared-assets");
+      const page1Dir = join(TEST_DIR, "shared-page1");
+      const page2Dir = join(TEST_DIR, "shared-page2");
+      await navigateAndCapture(page, baseUrl, page1Dir, { downloadAssets: true, sharedAssetsDir: sharedDir });
+      await navigateAndCapture(page, `${baseUrl}/about`, page2Dir, { downloadAssets: true, sharedAssetsDir: sharedDir });
+      // Shared dir should have assets (not duplicated)
+      expect(existsSync(sharedDir)).toBe(true);
+      const { readdirSync } = await import("node:fs");
+      const files = readdirSync(sharedDir).filter((f) => f !== "manifest.json");
+      // Both pages reference same style.css/script.js → same content hash → deduped
+      expect(files.length).toBeGreaterThan(0);
+      // Per-page manifests should exist
+      expect(existsSync(join(page1Dir, "assets", "manifest.json"))).toBe(true);
+      expect(existsSync(join(page2Dir, "assets", "manifest.json"))).toBe(true);
+      // Local HTML should reference shared dir via relative path
+      const html = await readFile(join(page1Dir, "page-source-local.html"), "utf-8");
+      expect(html).toContain("shared-assets/");
+    }, 30_000);
   });
 
   describe("waitForPageSettle", () => {

@@ -412,10 +412,10 @@
         },
         {
           "id": "ASSET-2",
-          "task": "Deduplicate shared assets across pages — single assets/ dir at site root with hash-based filenames, symlinks or manifest from per-page dirs",
+          "task": "Deduplicate shared assets across pages — single assets/ dir at site root with content-hash filenames. Plan: tasks/active/asset-2-dedup-assets-2026-03-17.md",
           "owner": "--",
           "depends": ["ASSET-1"],
-          "status": "pending",
+          "status": "in-progress",
           "release": "--"
         }
       ]

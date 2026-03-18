@@ -352,6 +352,10 @@ if (values.explore) {
   }
 }
 
+// Shared assets directory for multi-page captures
+const isMultiPage = targets.length > 1 || crawl;
+const sharedAssetsDir = (values["download-assets"] && isMultiPage) ? join(outDir, "assets") : null;
+
 // BFS crawl queue: { url, slug, depth }
 const queue = targets.map((t) => ({ ...t, depth: 0 }));
 const visited = new Set(targets.map((t) => normalizeUrl(t.url)));
@@ -393,6 +397,7 @@ async function worker() {
         types,
         networkFilter: values["network-filter"],
         downloadAssets: values["download-assets"],
+        sharedAssetsDir,
       });
 
       if (meta.errors) {
@@ -449,6 +454,30 @@ for (let i = 0; i < workerCount; i++) {
   workers.push(worker());
 }
 await Promise.all(workers);
+
+// Build site-level asset manifest for multi-page captures
+if (sharedAssetsDir) {
+  const { readFile: rf } = await import("node:fs/promises");
+  const siteManifest = { files: {}, stats: { totalFiles: 0, totalSize: 0, pages: {} } };
+  // Scan per-page manifest files
+  for (const target of queue.slice(0, captured + failed)) {
+    const pageManifestPath = join(outDir, target.slug, "assets", "manifest.json");
+    try {
+      const pageManifest = JSON.parse(await rf(pageManifestPath, "utf-8"));
+      for (const [url, info] of Object.entries(pageManifest)) {
+        if (!siteManifest.files[info.file]) {
+          siteManifest.files[info.file] = { contentType: info.contentType, size: info.size, urls: [], pages: [] };
+          siteManifest.stats.totalFiles++;
+          siteManifest.stats.totalSize += info.size;
+        }
+        const entry = siteManifest.files[info.file];
+        if (!entry.urls.includes(url)) entry.urls.push(url);
+        if (!entry.pages.includes(target.slug)) entry.pages.push(target.slug);
+      }
+    } catch { /* page may have failed */ }
+  }
+  await writeFile(join(sharedAssetsDir, "manifest.json"), JSON.stringify(siteManifest, null, 2));
+}
 
 // Finalize session video — get video path before closing context
 let sessionVideoSrc = null;
