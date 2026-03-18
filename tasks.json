@@ -402,18 +402,18 @@
           "tasks": [
             {
               "id": "CMS-6",
-              "task": "Remove 100-resource cap on MODX TV value extraction — fetch TV values for all resources regardless of count",
+              "task": "Remove 100-resource cap on MODX TV value extraction — fetch TV values for all resources regardless of count. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
               "owner": "--",
               "depends": ["CMS-4"],
-              "status": "pending",
+              "status": "in-progress",
               "release": "--"
             },
             {
               "id": "CMS-7",
-              "task": "Parse MODx.load() blocks from resource edit HTML for image/file TV values — connector Resource/Get omits TV values, must parse rendered edit page",
+              "task": "Parse MODx.load() blocks from resource edit HTML for image/file TV values — connector Resource/Get omits TV values, must parse rendered edit page. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
               "owner": "--",
               "depends": ["CMS-4"],
-              "status": "pending",
+              "status": "in-progress",
               "release": "--"
             },
             {
@@ -434,10 +434,10 @@
             },
             {
               "id": "CMS-10",
-              "task": "WordPress equivalent — extract ACF image/file field values from /wp-json/acf/ and download source media via /wp-json/wp/v2/media",
+              "task": "WordPress equivalent — extract ACF image/file field values from /wp-json/acf/ and download source media via /wp-json/wp/v2/media. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
               "owner": "--",
               "depends": ["CMS-3"],
-              "status": "pending",
+              "status": "in-progress",
               "release": "--"
             }
           ]
