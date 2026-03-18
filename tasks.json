@@ -207,14 +207,6 @@
       "prefix": "ECO",
       "tasks": [
         {
-          "id": "ECO-1",
-          "task": "sitegrade --browser integration: generate manifest from crawl URLs, run sitecap, feed rendered DOM + captures into analyzers",
-          "owner": "--",
-          "depends": ["CORE-5"],
-          "status": "backlog",
-          "release": "--"
-        },
-        {
           "id": "ECO-2",
           "task": "Evaluate sitetest.dev — full UI testing tool with CDP-attached interactions, flows, and multi-capture assertions",
           "owner": "--",
@@ -331,6 +323,86 @@
               "release": "v0.7.0"
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "CMS Capture",
+      "prefix": "CMS",
+      "waves": [
+        {
+          "id": "CMS-W1",
+          "parallelism": "SRL",
+          "tasks": [
+            {
+              "id": "CMS-1",
+              "task": "CMS auto-detection — detect MODX (window.MODx), WordPress (window.wp, /wp-json/), Drupal (window.Drupal) from page context. Write cms-detect.json per page. Plan: tasks/active/cms-1-cms-detection-2026-03-17.md",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-2",
+              "task": "MODX adapter — if admin session active, extract templates/chunks/snippets/plugins/TVs/resources via /connectors/index.php API. Write cms.json per site",
+              "owner": "--",
+              "depends": ["CMS-1"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-3",
+              "task": "WordPress adapter — if admin session active, extract themes/templates/posts/pages/CPTs/ACF fields via /wp-json/wp/v2/ REST API. Write cms.json per site",
+              "owner": "--",
+              "depends": ["CMS-1"],
+              "status": "pending",
+              "release": "--"
+            }
+          ]
+        },
+        {
+          "id": "CMS-W2",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "CMS-4",
+              "task": "TV value extraction per resource — for CMS pages with structured fields (MODX TVs, WP ACF, Drupal fields), extract field values alongside rendered capture",
+              "owner": "--",
+              "depends": ["CMS-2", "CMS-3"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-5",
+              "task": "Template dependency graph — parse CMS templates to map chunk/partial/include references. Output as dependency-graph.json for rebuild planning",
+              "owner": "--",
+              "depends": ["CMS-2", "CMS-3"],
+              "status": "pending",
+              "release": "--"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Asset Download",
+      "prefix": "ASSET",
+      "tasks": [
+        {
+          "id": "ASSET-1",
+          "task": "Add --download-assets flag to save CSS/JS/images/fonts from network.json to assets/ dir alongside captures. Rewrite URLs in page-source.html to local paths",
+          "owner": "--",
+          "depends": [],
+          "status": "pending",
+          "release": "--"
+        },
+        {
+          "id": "ASSET-2",
+          "task": "Deduplicate shared assets across pages — single assets/ dir at site root with hash-based filenames, symlinks or manifest from per-page dirs",
+          "owner": "--",
+          "depends": ["ASSET-1"],
+          "status": "pending",
+          "release": "--"
         }
       ]
     },
