@@ -203,20 +203,6 @@
       ]
     },
     {
-      "name": "CLI",
-      "prefix": "CLI",
-      "tasks": [
-        {
-          "id": "CLI-1",
-          "task": "Add --dry-run flag: crawl + discover URLs + CMS metadata, zero captures, zero downloads. Output inventory JSON (URLs found, CMS type, resource count, media refs). Plan: tasks/active/cli-1-dry-run-2026-03-18.md",
-          "owner": "--",
-          "depends": [],
-          "status": "in-progress",
-          "release": "--"
-        }
-      ]
-    },
-    {
       "name": "Demo",
       "prefix": "DEMO",
       "tasks": [

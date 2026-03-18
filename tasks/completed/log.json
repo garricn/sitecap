@@ -47,5 +47,11 @@
     "task": "Cross-reference TV file refs vs downloaded assets — coverage report",
     "status": "done",
     "date": "2026-03-18"
+  },
+  {
+    "id": "CLI-1",
+    "task": "Add --dry-run flag for crawl + inventory without captures",
+    "status": "done",
+    "date": "2026-03-18"
   }
 ]
