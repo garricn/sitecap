@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
-import { navigateAndCapture, extractLinks } from "../lib/capture.js";
+import { navigateAndCapture, extractLinks, setupNetworkCapture, waitForPageSettle } from "../lib/capture.js";
 import {
   launchChromeWithProfile,
   resolveProfileDir,
@@ -61,7 +61,7 @@ Options:
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
-    output: { type: "string", short: "o", default: "./output" },
+    output: { type: "string", short: "o" },
     port: { type: "string", short: "p", default: "9222" },
     types: { type: "string", short: "t" },
     manifest: { type: "string", short: "m" },
@@ -87,6 +87,7 @@ const { values, positionals } = parseArgs({
     "session-video": { type: "boolean", default: false },
     "download-assets": { type: "boolean", default: false },
     "download-media": { type: "boolean", default: false },
+    "dry-run": { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -125,6 +126,7 @@ Options:
   --session-video          Record one continuous video across all pages
   --download-assets        Download CSS/JS/images/fonts to assets/ dir
   --download-media         Download CMS media files (requires -t cms)
+  --dry-run                Crawl + discover URLs without capturing. Output inventory JSON to stdout
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -153,11 +155,17 @@ Examples:
   process.exit(0);
 }
 
-const outDir = resolve(values.output);
+const dryRun = values["dry-run"];
+
+// In dry-run mode, progress goes to stderr to keep stdout clean for JSON
+const log = dryRun ? (...args) => process.stderr.write(args.join(" ") + "\n") : console.log.bind(console);
+
+const outputExplicit = values.output !== undefined;
+const outDir = resolve(values.output || "./output");
 const port = parseInt(values.port, 10);
 let concurrency = Math.max(1, parseInt(values.concurrency, 10));
 const types = values.types ? values.types.split(",").map((s) => s.trim()) : undefined;
-const crawl = values.crawl;
+const crawl = dryRun || values.crawl; // --dry-run implies --crawl
 const maxDepth = parseInt(values["max-depth"], 10);
 const maxPages = parseInt(values["max-pages"], 10);
 const filterRe = values.filter ? new RegExp(values.filter) : null;
@@ -192,12 +200,14 @@ if (targets.length === 0) {
   process.exit(1);
 }
 
-if (crawl) {
-  console.log(`sitecap: crawling from ${targets.length} seed(s) → ${outDir} (max-depth: ${maxDepth}, max-pages: ${maxPages})`);
+if (dryRun) {
+  log(`sitecap: dry-run from ${targets.length} seed(s) (max-depth: ${maxDepth}, max-pages: ${maxPages})`);
+} else if (crawl) {
+  log(`sitecap: crawling from ${targets.length} seed(s) → ${outDir} (max-depth: ${maxDepth}, max-pages: ${maxPages})`);
 } else {
-  console.log(`sitecap: ${targets.length} page(s) → ${outDir}`);
+  log(`sitecap: ${targets.length} page(s) → ${outDir}`);
 }
-console.log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${concurrency}`);
+log(`Viewport: ${viewport.width}x${viewport.height}, concurrency: ${concurrency}`);
 
 // Validate flag combinations
 if (values["wait-for-auth"] && !values.profile) {
@@ -213,7 +223,7 @@ if (values.video && values["session-video"]) {
   process.exit(1);
 }
 if (values["session-video"] && concurrency > 1) {
-  console.log("Warning: --session-video requires sequential capture, forcing concurrency=1");
+  log("Warning: --session-video requires sequential capture, forcing concurrency=1");
   concurrency = 1;
 }
 
@@ -225,7 +235,7 @@ if (values.profile) {
   // Launch Chrome with profile via Playwright persistent context
   const userDataDir = values["user-data-dir"] || findUserDataDir();
   const profileDir = await resolveProfileDir(userDataDir, values.profile);
-  console.log(`Launching Chrome with profile "${values.profile}" (dir: ${profileDir})...`);
+  log(`Launching Chrome with profile "${values.profile}" (dir: ${profileDir})...`);
 
   try {
     const result = await launchChromeWithProfile({
@@ -238,7 +248,7 @@ if (values.profile) {
     console.error(e.message);
     process.exit(1);
   }
-  console.log("Chrome launched with profile.");
+  log("Chrome launched with profile.");
 
   // Wait for user to authenticate if requested
   if (values["wait-for-auth"]) {
@@ -246,12 +256,12 @@ if (values.profile) {
     const authUrl = values["auth-url"] || targets[0].url;
     await authPage.goto(authUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
     const loginUrl = authPage.url();
-    console.log(`Navigated to ${loginUrl}`);
-    console.log("Waiting for auth (complete login in Chrome, URL change will be detected)...");
+    log(`Navigated to ${loginUrl}`);
+    log("Waiting for auth (complete login in Chrome, URL change will be detected)...");
 
     // Poll for URL change — non-interactive, detects when login redirects
     await authPage.waitForURL((url) => url.href !== loginUrl, { timeout: 120_000 });
-    console.log(`Auth detected: ${authPage.url()}`);
+    log(`Auth detected: ${authPage.url()}`);
 
     // Save cookies for future runs
     const { saveGoogleAuthCookies } = await import("../lib/auth.js");
@@ -260,15 +270,15 @@ if (values.profile) {
     await saveGoogleAuthCookies(profileContext, profileDirForSave);
 
     await authPage.close();
-    console.log("Continuing with capture...");
+    log("Continuing with capture...");
   }
 } else {
   try {
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-    console.log(`Connected to Chrome on port ${port}`);
+    log(`Connected to Chrome on port ${port}`);
   } catch {
     if (values.launch) {
-      console.log("No Chrome found, launching headless...");
+      log("No Chrome found, launching headless...");
       browser = await chromium.launch({ headless: true });
     } else {
       console.error(
@@ -290,7 +300,7 @@ if (values.auth) {
   const authData = JSON.parse(await readFile(resolve(values.auth), "utf-8"));
   if (authData.cookies && authData.cookies.length > 0) {
     await context.addCookies(authData.cookies);
-    console.log(`Loaded ${authData.cookies.length} cookies from ${values.auth}`);
+    log(`Loaded ${authData.cookies.length} cookies from ${values.auth}`);
   }
   if (authData.localStorage) {
     // localStorage must be injected per-page after navigation, store for later
@@ -311,9 +321,9 @@ if (values["auth-flow"]) {
   const success = await runAuthFlow(resolve(values["auth-flow"]), authPage, context);
 
   if (success) {
-    console.log("Auth flow completed.");
+    log("Auth flow completed.");
   } else {
-    console.log("Auth flow did not complete — proceeding without auth.");
+    log("Auth flow did not complete — proceeding without auth.");
   }
   // Delete auth page's video artifact — session video should only come from the capture page
   if (values["session-video"] && authPage.video()) {
@@ -341,9 +351,9 @@ if (values.explore) {
   });
 
   if (success) {
-    console.log("Exploration flow completed.");
+    log("Exploration flow completed.");
   } else {
-    console.log("Exploration flow did not complete.");
+    log("Exploration flow did not complete.");
   }
   if (values["session-video"] && explorePage.video()) {
     const exploreVideoPath = await explorePage.video().path();
@@ -353,6 +363,147 @@ if (values.explore) {
     await explorePage.close();
   }
 }
+
+// --- DRY-RUN MODE ---
+if (dryRun) {
+  const startTime = Date.now();
+  const typesSet = types ? new Set(types) : new Set();
+  const doCms = typesSet.has("cms");
+
+  let detectCms;
+  if (doCms) {
+    ({ detectCms } = await import("../lib/cms.js"));
+  }
+
+  const page = await context.newPage();
+  await page.setViewportSize(viewport);
+
+  const queue = targets.map((t) => ({ ...t, depth: 0 }));
+  const visited = new Set(targets.map((t) => normalizeUrl(t.url)));
+  const pages = [];
+  let totalEnqueued = queue.length;
+  let failed = 0;
+
+  let idx = 0;
+  while (idx < queue.length && idx < maxPages) {
+    const target = queue[idx++];
+    log(`[${idx}/${totalEnqueued}+] ${target.url} (depth ${target.depth})`);
+
+    try {
+      // 1. Setup network capture BEFORE navigation (remove stale listeners from prior iteration)
+      page.removeAllListeners("response");
+      setupNetworkCapture(page, { networkFilter: "all" });
+
+      // 2. Navigate
+      await page.goto(target.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+
+      // 3. Wait for settle
+      await waitForPageSettle(page);
+
+      // 4. Extract links
+      const links = await extractLinks(page);
+
+      // 5. Count resources by type
+      const resources = {};
+      for (const entry of (page.__sitecapNetwork || [])) {
+        const rt = entry.resourceType || "other";
+        resources[rt] = (resources[rt] || 0) + 1;
+      }
+
+      // 6. CMS detection (opt-in)
+      let cms;
+      if (doCms) {
+        cms = await detectCms(page, page.__sitecapNetwork || []);
+      }
+
+      const pageEntry = {
+        url: target.url,
+        slug: target.slug,
+        depth: target.depth,
+        links,
+        resources,
+      };
+      if (cms) pageEntry.cms = cms;
+      pages.push(pageEntry);
+
+      log(`  ✓ ${links.length} links, ${Object.values(resources).reduce((a, b) => a + b, 0)} resources`);
+
+      // Enqueue discovered links
+      if (target.depth < maxDepth && totalEnqueued < maxPages) {
+        for (const link of links) {
+          if (totalEnqueued >= maxPages) break;
+          const norm = normalizeUrl(link);
+          if (visited.has(norm)) continue;
+          if (filterRe && !filterRe.test(link)) continue;
+          if (excludeRe && excludeRe.test(link)) continue;
+          visited.add(norm);
+          queue.push({ url: link, slug: slugify(link), depth: target.depth + 1 });
+          totalEnqueued++;
+        }
+      }
+    } catch (e) {
+      log(`  ✗ ${e.message}`);
+      failed++;
+    }
+  }
+
+  await page.close();
+
+  // Cleanup browser
+  if (profileContext) {
+    await shutdownChrome(profileContext);
+  } else if (browser) {
+    await browser.close();
+  }
+
+  // Build summary
+  const totalResources = {};
+  for (const p of pages) {
+    for (const [type, count] of Object.entries(p.resources)) {
+      totalResources[type] = (totalResources[type] || 0) + count;
+    }
+  }
+  const summary = {
+    totalPages: pages.length,
+    totalResources,
+  };
+  // CMS summary: pick the most common detected CMS
+  if (doCms) {
+    const cmsCounts = {};
+    for (const p of pages) {
+      if (p.cms?.detected && p.cms.cms) {
+        cmsCounts[p.cms.cms] = (cmsCounts[p.cms.cms] || 0) + 1;
+      }
+    }
+    const topCms = Object.entries(cmsCounts).sort((a, b) => b[1] - a[1])[0];
+    summary.cms = topCms ? topCms[0] : null;
+  }
+
+  const inventory = {
+    seed: targets[0].url,
+    timestamp: new Date().toISOString(),
+    duration_ms: Date.now() - startTime,
+    pages,
+    summary,
+  };
+
+  const inventoryJson = JSON.stringify(inventory, null, 2);
+
+  // Output: stdout by default, or file if -o/--output was explicitly passed
+  if (outputExplicit) {
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(outDir, { recursive: true });
+    await writeFile(join(outDir, "inventory.json"), inventoryJson);
+    log(`Inventory written to ${join(outDir, "inventory.json")}`);
+  } else {
+    process.stdout.write(inventoryJson + "\n");
+  }
+
+  log(`\nDone: ${pages.length} discovered, ${failed} failed.`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+// --- CAPTURE MODE ---
 
 // Shared assets directory for multi-page captures
 const isMultiPage = targets.length > 1 || crawl;
@@ -375,7 +526,7 @@ async function worker() {
     const target = queue[idx];
     const pageDir = join(outDir, target.slug);
     const label = crawl ? `[${idx + 1}/${totalEnqueued}+]` : `[${idx + 1}/${queue.length}]`;
-    console.log(`${label} ${target.url}${crawl ? ` (depth ${target.depth})` : ""}`);
+    log(`${label} ${target.url}${crawl ? ` (depth ${target.depth})` : ""}`);
 
     // For video: create a fresh context+page per URL so each gets its own recording
     let activePage = page;
@@ -404,9 +555,9 @@ async function worker() {
       });
 
       if (meta.errors) {
-        console.log(`  ⚠ partial: ${Object.keys(meta.errors).join(", ")}`);
+        log(`  ⚠ partial: ${Object.keys(meta.errors).join(", ")}`);
       } else {
-        console.log(`  ✓ ${Object.keys(meta.captures).length} files`);
+        log(`  ✓ ${Object.keys(meta.captures).length} files`);
       }
       captured++;
 
@@ -500,10 +651,10 @@ if (values["session-video"]) {
 if (profileContext) {
   if (values["close-after"]) {
     await shutdownChrome(profileContext);
-    console.log("Chrome closed.");
+    log("Chrome closed.");
   } else {
     await shutdownChrome(profileContext);
-    console.log("Chrome closed (persistent contexts cannot stay open after Playwright exits).");
+    log("Chrome closed (persistent contexts cannot stay open after Playwright exits).");
   }
 } else if (browser) {
   await browser.close();
@@ -514,13 +665,13 @@ if (sessionVideoSrc) {
   const destPath = join(outDir, "session-video.webm");
   try {
     await rename(sessionVideoSrc, destPath);
-    console.log(`Session video: ${destPath}`);
+    log(`Session video: ${destPath}`);
   } catch {
     // video file may not exist if all pages failed
   }
 }
 
-console.log(`\nDone: ${captured} captured, ${failed} failed.`);
+log(`\nDone: ${captured} captured, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);
 
 function normalizeUrl(url) {
