@@ -401,22 +401,6 @@
           "parallelism": "PARA",
           "tasks": [
             {
-              "id": "CMS-6",
-              "task": "Remove 100-resource cap on MODX TV value extraction — fetch TV values for all resources regardless of count. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
-              "owner": "--",
-              "depends": ["CMS-4"],
-              "status": "in-progress",
-              "release": "--"
-            },
-            {
-              "id": "CMS-7",
-              "task": "Parse MODx.load() blocks from resource edit HTML for image/file TV values — connector Resource/Get omits TV values, must parse rendered edit page. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
-              "owner": "--",
-              "depends": ["CMS-4"],
-              "status": "in-progress",
-              "release": "--"
-            },
-            {
               "id": "CMS-8",
               "task": "Discover CMS media source base paths and download source uploads — use MODX Browser/Directory/GetList or WP media API to find actual file storage, download originals",
               "owner": "--",
@@ -430,14 +414,6 @@
               "owner": "--",
               "depends": ["CMS-7", "CMS-8"],
               "status": "pending",
-              "release": "--"
-            },
-            {
-              "id": "CMS-10",
-              "task": "WordPress equivalent — extract ACF image/file field values from /wp-json/acf/ and download source media via /wp-json/wp/v2/media. Plan: tasks/active/cms-6-7-10-modx-wp-media-2026-03-18.md",
-              "owner": "--",
-              "depends": ["CMS-3"],
-              "status": "in-progress",
               "release": "--"
             }
           ]
