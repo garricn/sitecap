@@ -524,6 +524,58 @@ describe("CMS detection", () => {
       expect(coverage.items.find(i => i.ref === "post:1:missing_ref")).toBeUndefined();
     });
 
+    it("WordPress partial — resolved media URL missing from downloads", () => {
+      const cmsStructure = {
+        cms: "wordpress",
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              hero_image: { id: 123, url: "http://example.com/hero.jpg", mime: "image/jpeg" },
+              logo: { id: 456, url: "http://example.com/logo.png", mime: "image/png" },
+            },
+          },
+        ],
+        pages: [],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "http://example.com/hero.jpg", localPath: "cms-media/wp/123-hero.jpg", mime: "image/jpeg", size: 1000 },
+          // logo.png not in manifest — genuinely missing download
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(2);
+      expect(coverage.summary.withLocalCopy).toBe(1);
+      expect(coverage.summary.missing).toBe(1);
+      expect(coverage.items.find(i => i.ref === "post:1:logo").status).toBe("missing");
+    });
+
+    it("WordPress nested ACF groups — recursion into nested objects", () => {
+      const cmsStructure = {
+        cms: "wordpress",
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              header: {
+                background_image: { id: 789, url: "http://example.com/bg.jpg", mime: "image/jpeg" },
+                title: "Hello",
+              },
+            },
+          },
+        ],
+        pages: [],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "http://example.com/bg.jpg", localPath: "cms-media/wp/789-bg.jpg", mime: "image/jpeg", size: 500 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(1);
+      expect(coverage.items[0].ref).toBe("post:1:header.background_image");
+      expect(coverage.items[0].status).toBe("downloaded");
+    });
+
     it("empty input — 0 file fields, 100% coverage", () => {
       const cmsStructure = { cms: "modx", tvs: [], resources: [] };
       const mediaManifest = { files: [] };
