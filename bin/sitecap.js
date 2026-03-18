@@ -101,6 +101,7 @@ Options:
   -p, --port <port>        Chrome DevTools port (default: 9222)
   -t, --types <list>       Comma-separated capture types (default: all)
                            Types: screenshot,accessibility,html,network,console,storage,performance
+                           Opt-in: mhtml,cms
   -v, --viewport <WxH>     Viewport size (default: 1280x720)
   -c, --concurrency <n>    Parallel tabs (default: 4)
   --launch                 Auto-launch headless Chrome if not running
