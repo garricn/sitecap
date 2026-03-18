@@ -458,12 +458,13 @@ await Promise.all(workers);
 // Build site-level asset manifest for multi-page captures
 if (sharedAssetsDir) {
   const { readFile: rf } = await import("node:fs/promises");
-  const siteManifest = { files: {}, stats: { totalFiles: 0, totalSize: 0, pages: {} } };
+  const siteManifest = { files: {}, stats: { totalFiles: 0, totalSize: 0, savedBytes: 0 } };
   // Scan per-page manifest files
   for (const target of queue.slice(0, captured + failed)) {
     const pageManifestPath = join(outDir, target.slug, "assets", "manifest.json");
     try {
-      const pageManifest = JSON.parse(await rf(pageManifestPath, "utf-8"));
+      const raw = JSON.parse(await rf(pageManifestPath, "utf-8"));
+      const pageManifest = raw.deduped ? raw.assets : raw;
       for (const [url, info] of Object.entries(pageManifest)) {
         if (!siteManifest.files[info.file]) {
           siteManifest.files[info.file] = { contentType: info.contentType, size: info.size, urls: [], pages: [] };
@@ -472,7 +473,11 @@ if (sharedAssetsDir) {
         }
         const entry = siteManifest.files[info.file];
         if (!entry.urls.includes(url)) entry.urls.push(url);
-        if (!entry.pages.includes(target.slug)) entry.pages.push(target.slug);
+        if (!entry.pages.includes(target.slug)) {
+          // Each additional page referencing this file saves its size
+          if (entry.pages.length > 0) siteManifest.stats.savedBytes += info.size;
+          entry.pages.push(target.slug);
+        }
       }
     } catch { /* page may have failed */ }
   }

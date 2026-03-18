@@ -237,9 +237,12 @@ describe("capture", () => {
       const files = readdirSync(sharedDir).filter((f) => f !== "manifest.json");
       // Both pages reference same style.css/script.js → same content hash → deduped
       expect(files.length).toBeGreaterThan(0);
-      // Per-page manifests should exist
+      // Per-page manifests should exist with deduped flag
       expect(existsSync(join(page1Dir, "assets", "manifest.json"))).toBe(true);
-      expect(existsSync(join(page2Dir, "assets", "manifest.json"))).toBe(true);
+      const pageManifest = JSON.parse(await readFile(join(page1Dir, "assets", "manifest.json"), "utf-8"));
+      expect(pageManifest.deduped).toBe(true);
+      expect(pageManifest.sharedDir).toBe(sharedDir);
+      expect(pageManifest.assets).toBeDefined();
       // Local HTML should reference shared dir via relative path
       const html = await readFile(join(page1Dir, "page-source-local.html"), "utf-8");
       expect(html).toContain("shared-assets/");
