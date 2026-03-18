@@ -141,6 +141,59 @@ describe("CLI", () => {
     });
   });
 
+  describe("dry-run", () => {
+    it("outputs inventory JSON to stdout with no capture files", async () => {
+      const { stdout } = await exec(CLI, [BIN, baseUrl, "--launch", "--dry-run", "--max-pages", "3"], {
+        timeout: 30_000,
+      });
+      const inventory = JSON.parse(stdout);
+      expect(inventory.pages.length).toBeGreaterThan(0);
+      expect(inventory.summary.totalPages).toBe(inventory.pages.length);
+      expect(inventory.pages[0].resources).toBeDefined();
+      expect(Array.isArray(inventory.pages[0].links)).toBe(true);
+      expect(inventory.seed).toBe(baseUrl);
+      expect(inventory.timestamp).toBeDefined();
+      expect(inventory.duration_ms).toBeGreaterThan(0);
+      // No capture files should be written to default output dir
+      expect(existsSync(join("output", "127.0.0.1", "screenshot.png"))).toBe(false);
+      expect(existsSync(join("output", "127.0.0.1", "meta.json"))).toBe(false);
+    }, 30_000);
+
+    it("respects --max-pages", async () => {
+      const { stdout } = await exec(CLI, [BIN, baseUrl, "--launch", "--dry-run", "--max-pages", "2"], {
+        timeout: 30_000,
+      });
+      const inventory = JSON.parse(stdout);
+      expect(inventory.pages.length).toBeLessThanOrEqual(2);
+    }, 30_000);
+
+    it("includes CMS data when -t cms is specified", async () => {
+      const { stdout } = await exec(CLI, [BIN, `${baseUrl}/wordpress`, "--launch", "--dry-run", "-t", "cms", "--max-pages", "1"], {
+        timeout: 30_000,
+      });
+      const inventory = JSON.parse(stdout);
+      expect(inventory.pages[0].cms).toBeDefined();
+      expect(inventory.pages[0].cms.detected).toBe(true);
+      expect(inventory.pages[0].cms.cms).toBe("wordpress");
+      expect(inventory.pages[0].cms.confidence).toBeDefined();
+    }, 30_000);
+
+    it("shows --dry-run in help text", async () => {
+      const { stdout } = await exec(CLI, [BIN, "--help"]);
+      expect(stdout).toContain("--dry-run");
+    });
+
+    it("writes inventory.json when -o is explicitly set", async () => {
+      const outDir = join(TEST_DIR, "dry-run-file");
+      await exec(CLI, [BIN, baseUrl, "--launch", "--dry-run", "-o", outDir, "--max-pages", "1"], {
+        timeout: 30_000,
+      });
+      expect(existsSync(join(outDir, "inventory.json"))).toBe(true);
+      const inventory = JSON.parse(await readFile(join(outDir, "inventory.json"), "utf-8"));
+      expect(inventory.pages.length).toBeGreaterThan(0);
+    }, 30_000);
+  });
+
   describe("diff", () => {
     it("diffs two identical captures", async () => {
       const outA = join(TEST_DIR, "diff-a");
