@@ -35,5 +35,11 @@
     "task": "Add cli.test.js coverage for --download-assets --crawl shared assets wiring",
     "status": "done",
     "date": "2026-03-18"
+  },
+  {
+    "id": "CMS-8",
+    "task": "Discover CMS media source base paths and download source uploads via MODX Browser/Directory + WP media API",
+    "status": "done",
+    "date": "2026-03-18"
   }
 ]
