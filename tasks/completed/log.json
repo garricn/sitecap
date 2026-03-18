@@ -5,5 +5,11 @@
     "status": "moved",
     "note": "Moved to sitegrade tasks.json as BRO-1 — belongs in the consuming project, not sitecap",
     "date": "2026-03-17"
+  },
+  {
+    "id": "ASSET-2",
+    "task": "Deduplicate shared assets across pages — single assets/ dir at site root with content-hash filenames",
+    "status": "done",
+    "date": "2026-03-17"
   }
 ]

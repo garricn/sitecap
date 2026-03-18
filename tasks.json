@@ -395,6 +395,52 @@
               "release": "--"
             }
           ]
+        },
+        {
+          "id": "CMS-W3",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "CMS-6",
+              "task": "Remove 100-resource cap on MODX TV value extraction — fetch TV values for all resources regardless of count",
+              "owner": "--",
+              "depends": ["CMS-4"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-7",
+              "task": "Parse MODx.load() blocks from resource edit HTML for image/file TV values — connector Resource/Get omits TV values, must parse rendered edit page",
+              "owner": "--",
+              "depends": ["CMS-4"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-8",
+              "task": "Discover CMS media source base paths and download source uploads — use MODX Browser/Directory/GetList or WP media API to find actual file storage, download originals",
+              "owner": "--",
+              "depends": ["CMS-7"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-9",
+              "task": "Cross-reference TV file refs vs downloaded assets — produce coverage report showing which image/file TVs have local copies and which are missing",
+              "owner": "--",
+              "depends": ["CMS-7", "CMS-8"],
+              "status": "pending",
+              "release": "--"
+            },
+            {
+              "id": "CMS-10",
+              "task": "WordPress equivalent — extract ACF image/file field values from /wp-json/acf/ and download source media via /wp-json/wp/v2/media",
+              "owner": "--",
+              "depends": ["CMS-3"],
+              "status": "pending",
+              "release": "--"
+            }
+          ]
         }
       ]
     },
@@ -415,7 +461,7 @@
           "task": "Deduplicate shared assets across pages — single assets/ dir at site root with content-hash filenames. Plan: tasks/active/asset-2-dedup-assets-2026-03-17.md",
           "owner": "--",
           "depends": ["ASSET-1"],
-          "status": "in-progress",
+          "status": "done",
           "release": "--"
         }
       ]
