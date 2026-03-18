@@ -66,6 +66,15 @@ describe("CLI", () => {
       expect(existsSync(join(outDir, "127.0.0.1", "page-source.html"))).toBe(true);
     }, 30_000);
 
+    it("--download-assets with multiple URLs creates shared assets/ at outDir root", async () => {
+      const outDir = join(TEST_DIR, "shared-cli");
+      await exec(CLI, [BIN, baseUrl, `${baseUrl}/about`, "--launch", "-o", outDir, "--download-assets"], {
+        timeout: 30_000,
+      });
+      expect(existsSync(join(outDir, "assets"))).toBe(true);
+      expect(existsSync(join(outDir, "assets", "manifest.json"))).toBe(true);
+    }, 30_000);
+
     it("uses correct viewport", async () => {
       const outDir = join(TEST_DIR, "viewport");
       const { stdout } = await exec(CLI, [BIN, baseUrl, "--launch", "-o", outDir, "-v", "800x600"], {
