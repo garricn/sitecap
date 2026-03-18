@@ -39,7 +39,33 @@ export async function startTestServer() {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="generator" content="WordPress 6.4"><title>WP</title></head>
 <body><h1>WordPress Site</h1><link rel="stylesheet" href="/wp-content/themes/test/style.css">
-<script>window.wp = { heartbeat: {} };</script></body></html>`);
+<script>window.wp = { heartbeat: {} }; window.wpApiSettings = { root: '/wp-json/', nonce: 'test-nonce-123' };</script></body></html>`);
+    } else if (req.url?.startsWith("/wp-json/wp/v2/types")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ post: { slug: "post", name: "Posts", rest_base: "posts" }, page: { slug: "page", name: "Pages", rest_base: "pages" } }));
+    } else if (req.url?.startsWith("/wp-json/wp/v2/posts")) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("X-WP-Total", "1");
+      res.setHeader("X-WP-TotalPages", "1");
+      res.end(JSON.stringify([{ id: 1, title: { rendered: "Test Post" }, slug: "test-post", status: "publish", type: "post", template: "" }]));
+    } else if (req.url?.startsWith("/wp-json/wp/v2/pages")) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("X-WP-Total", "1");
+      res.setHeader("X-WP-TotalPages", "1");
+      res.end(JSON.stringify([{ id: 2, title: { rendered: "Test Page" }, slug: "test-page", status: "publish", template: "page-custom.php" }]));
+    } else if (req.url?.startsWith("/wp-json/wp/v2/themes")) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("X-WP-Total", "1");
+      res.setHeader("X-WP-TotalPages", "1");
+      res.end(JSON.stringify([{ stylesheet: "test-theme", name: { rendered: "Test Theme" }, status: "active" }]));
+    } else if (req.url?.startsWith("/wp-json/wp/v2/templates")) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("X-WP-Total", "0");
+      res.setHeader("X-WP-TotalPages", "1");
+      res.end("[]");
+    } else if (req.url?.startsWith("/wp-json/acf/")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end("[]");
     } else if (req.url === "/modx") {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>MODX</title></head>
@@ -49,7 +75,10 @@ export async function startTestServer() {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>MODX Manager</title></head>
 <body><h1>MODX Manager</h1>
-<script>window.MODx = { config: { site_id: "abc123" } };</script></body></html>`);
+<script>window.MODx = { config: { site_id: "abc123", connectors_url: "/connectors/" } };</script></body></html>`);
+    } else if (req.url?.startsWith("/connectors/")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ success: true, total: 1, results: [{ id: 1, name: "TestElement", description: "Mock element" }] }));
     } else if (req.url === "/drupal") {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="generator" content="Drupal 10"><title>Drupal</title></head>
