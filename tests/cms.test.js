@@ -9,6 +9,7 @@ import { startTestServer } from "./helpers/server.js";
 import { parseModxLoadBlock, listModxMediaSources } from "../lib/cms/modx.js";
 import { collectWpMediaUrls } from "../lib/cms/wordpress.js";
 import { downloadCmsMedia } from "../lib/cms/media.js";
+import { generateMediaCoverage } from "../lib/cms/coverage.js";
 
 const TEST_DIR = "/tmp/sitecap-test-cms";
 
@@ -421,5 +422,268 @@ describe("CMS detection", () => {
       expect(existsSync(join(outDir, "cms-media"))).toBe(false);
       expect(existsSync(join(outDir, "cms-media.json"))).toBe(false);
     });
+  });
+
+  describe("CMS media coverage", () => {
+    it("MODX all downloaded — 100% coverage", () => {
+      const cmsStructure = {
+        cms: "modx",
+        tvs: [
+          { name: "hero_image", type: "image" },
+          { name: "sidebar_file", type: "file" },
+          { name: "gallery", type: "migx" },
+        ],
+        resources: [
+          { id: 1, fields: { hero_image: "/assets/hero.jpg", sidebar_file: "/assets/doc.pdf", gallery: "/assets/gallery.json" } },
+        ],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "/assets/hero.jpg", localPath: "cms-media/modx/1/hero.jpg", mime: "image/jpeg", size: 1000 },
+          { url: "/assets/doc.pdf", localPath: "cms-media/modx/1/doc.pdf", mime: "application/pdf", size: 2000 },
+          { url: "/assets/gallery.json", localPath: "cms-media/modx/1/gallery.json", mime: "application/json", size: 500 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.cms).toBe("modx");
+      expect(coverage.summary.totalFileFields).toBe(3);
+      expect(coverage.summary.withLocalCopy).toBe(3);
+      expect(coverage.summary.withError).toBe(0);
+      expect(coverage.summary.missing).toBe(0);
+      expect(coverage.summary.coveragePercent).toBe(100);
+      expect(coverage.items.every(i => i.status === "downloaded")).toBe(true);
+      expect(coverage.items[0].ref).toBe("resource:1:hero_image");
+      expect(coverage.items[0].localPath).toBe("cms-media/modx/1/hero.jpg");
+    });
+
+    it("MODX partial — 1 downloaded, 1 error, 1 missing", () => {
+      const cmsStructure = {
+        cms: "modx",
+        tvs: [
+          { name: "hero_image", type: "image" },
+          { name: "sidebar_file", type: "file" },
+          { name: "logo", type: "image" },
+        ],
+        resources: [
+          { id: 1, fields: { hero_image: "/assets/hero.jpg", sidebar_file: "/assets/doc.pdf", logo: "/assets/logo.png" } },
+        ],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "/assets/hero.jpg", localPath: "cms-media/modx/1/hero.jpg", mime: "image/jpeg", size: 1000 },
+          { url: "/assets/doc.pdf", error: "HTTP 404" },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(3);
+      expect(coverage.summary.withLocalCopy).toBe(1);
+      expect(coverage.summary.withError).toBe(1);
+      expect(coverage.summary.missing).toBe(1);
+      expect(coverage.summary.coveragePercent).toBeCloseTo(33.3, 0);
+      expect(coverage.items.find(i => i.ref === "resource:1:hero_image").status).toBe("downloaded");
+      expect(coverage.items.find(i => i.ref === "resource:1:sidebar_file").status).toBe("error");
+      expect(coverage.items.find(i => i.ref === "resource:1:logo").status).toBe("missing");
+    });
+
+    it("WordPress coverage — resolved ACF objects", () => {
+      const cmsStructure = {
+        cms: "wordpress",
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              hero_image: { id: 123, url: "http://example.com/hero.jpg", mime: "image/jpeg" },
+              hero_text: "Welcome",
+              missing_ref: 999,
+            },
+          },
+        ],
+        pages: [
+          {
+            id: 2, fields: {
+              banner: { id: 456, url: "http://example.com/banner.png", mime: "image/png" },
+            },
+          },
+        ],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "http://example.com/hero.jpg", localPath: "cms-media/wp/123-hero.jpg", mime: "image/jpeg", size: 1000 },
+          { url: "http://example.com/banner.png", localPath: "cms-media/wp/456-banner.png", mime: "image/png", size: 2000 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.cms).toBe("wordpress");
+      expect(coverage.summary.totalFileFields).toBe(2);
+      expect(coverage.summary.withLocalCopy).toBe(2);
+      expect(coverage.summary.coveragePercent).toBe(100);
+      // hero_text (string) and missing_ref (integer) should NOT appear as file fields
+      expect(coverage.items.find(i => i.ref === "post:1:hero_image")).toBeDefined();
+      expect(coverage.items.find(i => i.ref === "post:1:hero_image").status).toBe("downloaded");
+      expect(coverage.items.find(i => i.ref === "page:2:banner")).toBeDefined();
+      expect(coverage.items.find(i => i.ref === "post:1:hero_text")).toBeUndefined();
+      expect(coverage.items.find(i => i.ref === "post:1:missing_ref")).toBeUndefined();
+    });
+
+    it("WordPress partial — resolved media URL missing from downloads", () => {
+      const cmsStructure = {
+        cms: "wordpress",
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              hero_image: { id: 123, url: "http://example.com/hero.jpg", mime: "image/jpeg" },
+              logo: { id: 456, url: "http://example.com/logo.png", mime: "image/png" },
+            },
+          },
+        ],
+        pages: [],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "http://example.com/hero.jpg", localPath: "cms-media/wp/123-hero.jpg", mime: "image/jpeg", size: 1000 },
+          // logo.png not in manifest — genuinely missing download
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(2);
+      expect(coverage.summary.withLocalCopy).toBe(1);
+      expect(coverage.summary.missing).toBe(1);
+      expect(coverage.items.find(i => i.ref === "post:1:logo").status).toBe("missing");
+    });
+
+    it("WordPress nested ACF groups — recursion into nested objects", () => {
+      const cmsStructure = {
+        cms: "wordpress",
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              header: {
+                background_image: { id: 789, url: "http://example.com/bg.jpg", mime: "image/jpeg" },
+                title: "Hello",
+              },
+            },
+          },
+        ],
+        pages: [],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "http://example.com/bg.jpg", localPath: "cms-media/wp/789-bg.jpg", mime: "image/jpeg", size: 500 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(1);
+      expect(coverage.items[0].ref).toBe("post:1:header.background_image");
+      expect(coverage.items[0].status).toBe("downloaded");
+    });
+
+    it("empty input — 0 file fields, 100% coverage", () => {
+      const cmsStructure = { cms: "modx", tvs: [], resources: [] };
+      const mediaManifest = { files: [] };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(0);
+      expect(coverage.summary.coveragePercent).toBe(100);
+      expect(coverage.items.length).toBe(0);
+    });
+
+    it("skipped files count as missing", () => {
+      const cmsStructure = {
+        cms: "modx",
+        tvs: [{ name: "big_file", type: "file" }],
+        resources: [{ id: 1, fields: { big_file: "/assets/huge.zip" } }],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "/assets/huge.zip", localPath: "cms-media/modx/1/huge.zip", skipped: "size_limit" },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(1);
+      expect(coverage.summary.withLocalCopy).toBe(0);
+      expect(coverage.summary.missing).toBe(1);
+      expect(coverage.items[0].status).toBe("skipped");
+      expect(coverage.items[0].reason).toBe("size_limit");
+    });
+
+    it("MODX ignores non-file TV types", () => {
+      const cmsStructure = {
+        cms: "modx",
+        tvs: [
+          { name: "hero_image", type: "image" },
+          { name: "plain_text", type: "text" },
+          { name: "some_number", type: "number" },
+        ],
+        resources: [
+          { id: 1, fields: { hero_image: "/assets/hero.jpg", plain_text: "Hello", some_number: "42" } },
+        ],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "/assets/hero.jpg", localPath: "cms-media/modx/1/hero.jpg", mime: "image/jpeg", size: 1000 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(1);
+      expect(coverage.items.length).toBe(1);
+      expect(coverage.items[0].ref).toBe("resource:1:hero_image");
+    });
+
+    it("MODX skips empty string TV values", () => {
+      const cmsStructure = {
+        cms: "modx",
+        tvs: [{ name: "hero_image", type: "image" }],
+        resources: [
+          { id: 1, fields: { hero_image: "" } },
+          { id: 2, fields: { hero_image: "/assets/hero.jpg" } },
+        ],
+      };
+      const mediaManifest = {
+        files: [
+          { url: "/assets/hero.jpg", localPath: "cms-media/modx/1/hero.jpg", mime: "image/jpeg", size: 1000 },
+        ],
+      };
+      const coverage = generateMediaCoverage(cmsStructure, mediaManifest);
+      expect(coverage.summary.totalFileFields).toBe(1);
+      expect(coverage.items[0].ref).toBe("resource:2:hero_image");
+    });
+
+    it("integration — MODX admin mock with downloadCmsMedia then generateMediaCoverage", async () => {
+      const outDir = join(TEST_DIR, "cms-coverage-integration");
+      await rm(outDir, { recursive: true, force: true });
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const cmsStructure = await extractCmsStructure(page, detection);
+
+      await downloadCmsMedia(page, cmsStructure, detection, outDir, { downloadMedia: true });
+
+      const manifestPath = join(outDir, "cms-media.json");
+      expect(existsSync(manifestPath)).toBe(true);
+      const manifest = JSON.parse(await readFile(manifestPath, "utf-8"));
+
+      const coverage = generateMediaCoverage(cmsStructure, manifest);
+      expect(coverage.cms).toBe("modx");
+      expect(coverage.summary.totalFileFields).toBeGreaterThan(0);
+      expect(coverage.timestamp).toBeDefined();
+      // Every item should have a valid status
+      for (const item of coverage.items) {
+        expect(["downloaded", "error", "missing", "skipped"]).toContain(item.status);
+        expect(item.ref).toMatch(/^resource:\d+:\w+/);
+        expect(item.url).toBeTruthy();
+      }
+    }, 30000);
+
+    it("integration — capture flow writes cms-media-coverage.json", async () => {
+      const outDir = join(TEST_DIR, "cms-coverage-capture");
+      await rm(outDir, { recursive: true, force: true });
+      await navigateAndCapture(page, `${baseUrl}/modx-admin`, outDir, {
+        types: ["cms"],
+        downloadMedia: true,
+      });
+      const coveragePath = join(outDir, "cms-media-coverage.json");
+      expect(existsSync(coveragePath)).toBe(true);
+      const coverage = JSON.parse(await readFile(coveragePath, "utf-8"));
+      expect(coverage.cms).toBe("modx");
+      expect(coverage.summary.totalFileFields).toBeGreaterThan(0);
+      expect(coverage.items.length).toBeGreaterThan(0);
+    }, 30000);
   });
 });
