@@ -405,7 +405,7 @@
               "task": "Discover CMS media source base paths and download source uploads — use MODX Browser/Directory/GetList or WP media API to find actual file storage, download originals",
               "owner": "--",
               "depends": ["CMS-7"],
-              "status": "pending",
+              "status": "in-progress",
               "release": "--"
             },
             {

@@ -6,7 +6,9 @@ import { existsSync } from "node:fs";
 import { detectCms, extractCmsStructure, buildDependencyGraph } from "../lib/cms.js";
 import { navigateAndCapture } from "../lib/capture.js";
 import { startTestServer } from "./helpers/server.js";
-import { parseModxLoadBlock } from "../lib/cms/modx.js";
+import { parseModxLoadBlock, listModxMediaSources } from "../lib/cms/modx.js";
+import { collectWpMediaUrls } from "../lib/cms/wordpress.js";
+import { downloadCmsMedia } from "../lib/cms/media.js";
 
 const TEST_DIR = "/tmp/sitecap-test-cms";
 
@@ -278,6 +280,146 @@ describe("CMS detection", () => {
       const outDir = join(TEST_DIR, "no-cms-capture");
       await navigateAndCapture(page, `${baseUrl}/wordpress`, outDir);
       expect(existsSync(join(outDir, "cms-detect.json"))).toBe(false);
+    });
+  });
+
+  describe("CMS media download", () => {
+    it("discovers MODX media sources", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const context = detection.context;
+      const resolvedConnectorsUrl = new URL(context.connectorsUrl, page.url()).href;
+      const sources = await listModxMediaSources(page, resolvedConnectorsUrl, context.siteId);
+      expect(sources.length).toBe(2);
+      expect(sources[0].name).toBe("Assets");
+      expect(sources[0].baseUrl).toBe("/assets/");
+      expect(sources[1].name).toBe("Images");
+      expect(sources[1].baseUrl).toBe("/assets/images/");
+    });
+
+    it("downloads MODX media files and writes manifest", async () => {
+      const outDir = join(TEST_DIR, "cms-media-modx");
+      await rm(outDir, { recursive: true, force: true });
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const cmsStructure = await extractCmsStructure(page, detection);
+
+      await downloadCmsMedia(page, cmsStructure, detection, outDir, { downloadMedia: true });
+
+      // Manifest should exist
+      const manifestPath = join(outDir, "cms-media.json");
+      expect(existsSync(manifestPath)).toBe(true);
+      const manifest = JSON.parse(await readFile(manifestPath, "utf-8"));
+
+      // Sources should be listed
+      expect(manifest.sources.length).toBe(2);
+      expect(manifest.sources[0].name).toBe("Assets");
+      expect(manifest.sources[0].baseUrl).toBe("/assets/");
+
+      // Files should be downloaded
+      expect(manifest.files.length).toBeGreaterThanOrEqual(1);
+      expect(manifest.stats.downloaded).toBeGreaterThanOrEqual(1);
+      expect(manifest.stats.errors).toBe(0);
+
+      // Check exact localPath format, mime populated, and file on disk
+      const downloadedFile = manifest.files.find(f => f.localPath && !f.error);
+      expect(downloadedFile).toBeDefined();
+      expect(downloadedFile.localPath).toMatch(/^cms-media\/modx\/\d+\//);
+      expect(downloadedFile.mime).not.toBe("");
+      expect(existsSync(join(outDir, downloadedFile.localPath))).toBe(true);
+    }, 30000);
+
+    it("downloads WordPress media files and writes manifest", async () => {
+      const outDir = join(TEST_DIR, "cms-media-wp");
+      await rm(outDir, { recursive: true, force: true });
+      await page.goto(`${baseUrl}/wordpress`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const cmsStructure = await extractCmsStructure(page, detection);
+
+      await downloadCmsMedia(page, cmsStructure, detection, outDir, { downloadMedia: true });
+
+      // Manifest should exist
+      const manifestPath = join(outDir, "cms-media.json");
+      expect(existsSync(manifestPath)).toBe(true);
+      const manifest = JSON.parse(await readFile(manifestPath, "utf-8"));
+
+      // File should be downloaded
+      expect(manifest.files.length).toBeGreaterThanOrEqual(1);
+      expect(manifest.stats.downloaded).toBeGreaterThanOrEqual(1);
+      expect(manifest.stats.errors).toBe(0);
+
+      // Check WP file on disk
+      const wpFile = manifest.files.find(f => f.localPath.includes("123-hero.jpg"));
+      expect(wpFile).toBeDefined();
+      expect(existsSync(join(outDir, wpFile.localPath))).toBe(true);
+
+      // Check referencedBy
+      expect(wpFile.referencedBy).toContain("post:1:hero_image");
+    }, 30000);
+
+    it("validates referencedBy format", async () => {
+      await page.goto(`${baseUrl}/wordpress`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const cmsStructure = await extractCmsStructure(page, detection);
+      const mediaMap = collectWpMediaUrls(cmsStructure);
+
+      for (const [, media] of mediaMap) {
+        for (const ref of media.referencedBy) {
+          expect(ref).toMatch(/^(resource|post|page):\d+:\w+(\.\w+)*$/);
+        }
+      }
+    });
+
+    it("collects WP media URLs from resolved ACF fields", async () => {
+      // Build a mock cmsStructure with resolved ACF media
+      const cmsStructure = {
+        posts: [
+          {
+            id: 1, type: "post", fields: {
+              hero_image: { id: 123, url: "http://example.com/hero.jpg", mime: "image/jpeg" },
+              hero_text: "Welcome",
+              gallery: [
+                { id: 456, url: "http://example.com/img1.jpg", mime: "image/png" },
+              ],
+            },
+          },
+        ],
+        pages: [
+          {
+            id: 2, fields: {
+              banner: { id: 123, url: "http://example.com/hero.jpg", mime: "image/jpeg" },
+            },
+          },
+        ],
+      };
+      const mediaMap = collectWpMediaUrls(cmsStructure);
+      expect(mediaMap.size).toBe(2); // 123 and 456
+      expect(mediaMap.get(123).referencedBy).toContain("post:1:hero_image");
+      expect(mediaMap.get(123).referencedBy).toContain("page:2:banner");
+      expect(mediaMap.get(456).referencedBy).toContain("post:1:gallery.0");
+    });
+
+    it("does NOT create cms-media/ dir when downloadMedia is false", async () => {
+      const outDir = join(TEST_DIR, "cms-media-off");
+      await rm(outDir, { recursive: true, force: true });
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const cmsStructure = await extractCmsStructure(page, detection);
+
+      await downloadCmsMedia(page, cmsStructure, detection, outDir, { downloadMedia: false });
+
+      expect(existsSync(join(outDir, "cms-media"))).toBe(false);
+      expect(existsSync(join(outDir, "cms-media.json"))).toBe(false);
+    }, 30000);
+
+    it("does NOT create cms-media/ dir via capture without downloadMedia flag", async () => {
+      const outDir = join(TEST_DIR, "cms-capture-no-media");
+      await rm(outDir, { recursive: true, force: true });
+      await navigateAndCapture(page, `${baseUrl}/modx-admin`, outDir, {
+        types: ["cms"],
+      });
+      expect(existsSync(join(outDir, "cms-media"))).toBe(false);
+      expect(existsSync(join(outDir, "cms-media.json"))).toBe(false);
     });
   });
 });

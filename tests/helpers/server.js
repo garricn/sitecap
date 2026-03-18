@@ -104,6 +104,20 @@ export async function startTestServer() {
 <body>
 <script>MODx.load({xtype:"modx-panel-resource",items:[{xtype:"modx-panel-resource-tv",items:[{"fieldLabel":"hero_image","name":"tv123","xtype":"modx-panel-tv-image","value":"/assets/images/hero.jpg"},{"fieldLabel":"sidebar_file","name":"tv456","xtype":"modx-panel-tv-file","value":"/assets/docs/guide.pdf"},{"fieldLabel":"plain_text","name":"tv789","xtype":"textfield","value":"Hello from load"}]}]});</script>
 </body></html>`);
+    } else if (req.url === "/assets/hero.jpg") {
+      res.setHeader("Content-Type", "image/jpeg");
+      res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
+    } else if (req.url === "/assets/docs/guide.pdf") {
+      res.setHeader("Content-Type", "application/pdf");
+      res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
+    } else if (req.url === "/assets/images/hero.jpg") {
+      res.setHeader("Content-Type", "image/jpeg");
+      // 1x1 red PNG (reuse existing pattern)
+      res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
+    } else if (req.url === "/wp-content/uploads/hero.jpg") {
+      res.setHeader("Content-Type", "image/jpeg");
+      // 1x1 red PNG (reuse existing pattern)
+      res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"));
     } else if (req.url?.startsWith("/connectors/")) {
       res.setHeader("Content-Type", "application/json");
       // Read POST body to differentiate connector actions
@@ -137,6 +151,25 @@ export async function startTestServer() {
         res.end(JSON.stringify({ success: true, total: 150, results: resources }));
       } else if (body.includes("element/template/get&") || body.includes("element/chunk/get&")) {
         res.end(JSON.stringify({ success: true, object: { id: 1, name: "BaseTemplate", content: "<html>[[$header]][[getResources]]</html>" } }));
+      } else if (body.includes("source%2Fgetlist") || body.includes("action=source/getlist")) {
+        // CMS-8: List media sources (URL-encoded from fetchModxSource)
+        res.end(JSON.stringify({ success: true, total: 2, results: [
+          { id: 1, name: "Assets" },
+          { id: 2, name: "Images" },
+        ] }));
+      } else if ((body.includes("source%2Fget&") || body.includes("action=source/get&")) && !body.includes("getlist")) {
+        // CMS-8: Get media source properties
+        const idMatch = body.match(/id=(\d+)/);
+        const sourceId = idMatch ? parseInt(idMatch[1]) : 1;
+        const props = sourceId === 1
+          ? { basePath: { value: "assets/" }, baseUrl: { value: "/assets/" } }
+          : { basePath: { value: "assets/images/" }, baseUrl: { value: "/assets/images/" } };
+        res.end(JSON.stringify({ success: true, object: { id: sourceId, name: sourceId === 1 ? "Assets" : "Images", properties: props } }));
+      } else if (body.includes("browser%2Fdirectory%2Fgetlist") || body.includes("browser/directory/getlist")) {
+        // CMS-8: List files in media source
+        res.end(JSON.stringify({ success: true, total: 1, results: [
+          { name: "hero.jpg", pathname: "images/hero.jpg", type: "image/jpeg" },
+        ] }));
       } else {
         res.end(JSON.stringify({ success: true, total: 1, results: [{ id: 1, name: "TestElement", description: "Mock element" }] }));
       }
