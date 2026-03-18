@@ -358,18 +358,18 @@
             },
             {
               "id": "CMS-2",
-              "task": "MODX adapter — if admin session active, extract templates/chunks/snippets/plugins/TVs/resources via /connectors/index.php API. Write cms.json per site",
+              "task": "MODX adapter — if admin session active, extract templates/chunks/snippets/plugins/TVs/resources via /connectors/index.php API. Write cms.json per site. Plan: tasks/active/cms-2-3-cms-adapters-2026-03-17.md",
               "owner": "--",
               "depends": ["CMS-1"],
-              "status": "pending",
+              "status": "done",
               "release": "--"
             },
             {
               "id": "CMS-3",
-              "task": "WordPress adapter — if admin session active, extract themes/templates/posts/pages/CPTs/ACF fields via /wp-json/wp/v2/ REST API. Write cms.json per site",
+              "task": "WordPress adapter — if admin session active, extract themes/templates/posts/pages/CPTs/ACF fields via /wp-json/wp/v2/ REST API. Write cms.json per site. Plan: tasks/active/cms-2-3-cms-adapters-2026-03-17.md",
               "owner": "--",
               "depends": ["CMS-1"],
-              "status": "pending",
+              "status": "done",
               "release": "--"
             }
           ]
