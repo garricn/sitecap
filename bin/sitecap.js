@@ -61,7 +61,7 @@ Options:
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
-    output: { type: "string", short: "o", default: "./output" },
+    output: { type: "string", short: "o" },
     port: { type: "string", short: "p", default: "9222" },
     types: { type: "string", short: "t" },
     manifest: { type: "string", short: "m" },
@@ -160,7 +160,8 @@ const dryRun = values["dry-run"];
 // In dry-run mode, progress goes to stderr to keep stdout clean for JSON
 const log = dryRun ? (...args) => process.stderr.write(args.join(" ") + "\n") : console.log.bind(console);
 
-const outDir = resolve(values.output);
+const outputExplicit = values.output !== undefined;
+const outDir = resolve(values.output || "./output");
 const port = parseInt(values.port, 10);
 let concurrency = Math.max(1, parseInt(values.concurrency, 10));
 const types = values.types ? values.types.split(",").map((s) => s.trim()) : undefined;
@@ -389,7 +390,8 @@ if (dryRun) {
     log(`[${idx}/${totalEnqueued}+] ${target.url} (depth ${target.depth})`);
 
     try {
-      // 1. Setup network capture BEFORE navigation
+      // 1. Setup network capture BEFORE navigation (remove stale listeners from prior iteration)
+      page.removeAllListeners("response");
       setupNetworkCapture(page, { networkFilter: "all" });
 
       // 2. Navigate
@@ -488,7 +490,6 @@ if (dryRun) {
   const inventoryJson = JSON.stringify(inventory, null, 2);
 
   // Output: stdout by default, or file if -o/--output was explicitly passed
-  const outputExplicit = process.argv.includes("-o") || process.argv.includes("--output");
   if (outputExplicit) {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(outDir, { recursive: true });

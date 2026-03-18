@@ -154,9 +154,10 @@ describe("CLI", () => {
       expect(inventory.seed).toBe(baseUrl);
       expect(inventory.timestamp).toBeDefined();
       expect(inventory.duration_ms).toBeGreaterThan(0);
-      // No capture files should be written to default output dir
-      expect(existsSync(join("output", "127.0.0.1", "screenshot.png"))).toBe(false);
-      expect(existsSync(join("output", "127.0.0.1", "meta.json"))).toBe(false);
+      // No capture files should be written (dry-run without -o doesn't create output dir)
+      const defaultOutDir = join(import.meta.dirname, "..", "output");
+      expect(existsSync(join(defaultOutDir, "127.0.0.1", "screenshot.png"))).toBe(false);
+      expect(existsSync(join(defaultOutDir, "127.0.0.1", "meta.json"))).toBe(false);
     }, 30_000);
 
     it("respects --max-pages", async () => {
