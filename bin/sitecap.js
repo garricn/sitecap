@@ -86,6 +86,7 @@ const { values, positionals } = parseArgs({
     video: { type: "boolean", default: false },
     "session-video": { type: "boolean", default: false },
     "download-assets": { type: "boolean", default: false },
+    "download-media": { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -123,6 +124,7 @@ Options:
   --video                  Record per-page video clips (off by default)
   --session-video          Record one continuous video across all pages
   --download-assets        Download CSS/JS/images/fonts to assets/ dir
+  --download-media         Download CMS media files (requires -t cms)
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -397,6 +399,7 @@ async function worker() {
         types,
         networkFilter: values["network-filter"],
         downloadAssets: values["download-assets"],
+        downloadMedia: values["download-media"],
         sharedAssetsDir,
       });
 

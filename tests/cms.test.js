@@ -316,18 +316,17 @@ describe("CMS detection", () => {
       expect(manifest.sources[0].name).toBe("Assets");
       expect(manifest.sources[0].baseUrl).toBe("/assets/");
 
-      // Files should be downloaded (resource 1 has hero_image=/assets/hero.jpg matching source 1 baseUrl=/assets/)
+      // Files should be downloaded
       expect(manifest.files.length).toBeGreaterThanOrEqual(1);
-
-      // Check that at least one file was downloaded
       expect(manifest.stats.downloaded).toBeGreaterThanOrEqual(1);
       expect(manifest.stats.errors).toBe(0);
 
-      // Check a downloaded file exists on disk
+      // Check exact localPath format, mime populated, and file on disk
       const downloadedFile = manifest.files.find(f => f.localPath && !f.error);
-      if (downloadedFile) {
-        expect(existsSync(join(outDir, downloadedFile.localPath))).toBe(true);
-      }
+      expect(downloadedFile).toBeDefined();
+      expect(downloadedFile.localPath).toMatch(/^cms-media\/modx\/\d+\//);
+      expect(downloadedFile.mime).not.toBe("");
+      expect(existsSync(join(outDir, downloadedFile.localPath))).toBe(true);
     }, 30000);
 
     it("downloads WordPress media files and writes manifest", async () => {
