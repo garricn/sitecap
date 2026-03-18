@@ -21,6 +21,7 @@ export default [
         document: "readonly",
         performance: "readonly",
         fetch: "readonly",
+        window: "readonly",
       },
     },
   },

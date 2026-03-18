@@ -339,7 +339,7 @@
               "task": "CMS auto-detection — detect MODX (window.MODx), WordPress (window.wp, /wp-json/), Drupal (window.Drupal) from page context. Write cms-detect.json per page. Plan: tasks/active/cms-1-cms-detection-2026-03-17.md",
               "owner": "--",
               "depends": [],
-              "status": "pending",
+              "status": "done",
               "release": "--"
             },
             {
