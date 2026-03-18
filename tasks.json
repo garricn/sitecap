@@ -439,14 +439,6 @@
           "depends": ["ASSET-1"],
           "status": "done",
           "release": "--"
-        },
-        {
-          "id": "ASSET-3",
-          "task": "Add cli.test.js coverage for --download-assets --crawl: assert shared assets/ created at outDir root and sharedAssetsDir wired correctly to navigateAndCapture",
-          "owner": "--",
-          "depends": ["ASSET-2"],
-          "status": "in-progress",
-          "release": "--"
         }
       ]
     },
