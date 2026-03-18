@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { rm } from "node:fs/promises";
+import { rm, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { startTestServer } from "./helpers/server.js";
@@ -74,6 +74,34 @@ describe("CLI", () => {
       expect(existsSync(join(outDir, "assets"))).toBe(true);
       expect(existsSync(join(outDir, "assets", "manifest.json"))).toBe(true);
     }, 30_000);
+
+    it("--download-assets --crawl creates shared assets/ at outDir root", async () => {
+      const outDir = join(TEST_DIR, "shared-crawl");
+      await exec(CLI, [BIN, baseUrl, "--launch", "-o", outDir, "--download-assets", "--crawl", "--max-pages", "3"], {
+        timeout: 60_000,
+      });
+      // Shared assets/ dir exists at outDir root
+      expect(existsSync(join(outDir, "assets"))).toBe(true);
+      // Site-level manifest exists in shared assets dir
+      expect(existsSync(join(outDir, "assets", "manifest.json"))).toBe(true);
+      const siteManifest = JSON.parse(await readFile(join(outDir, "assets", "manifest.json"), "utf-8"));
+      expect(siteManifest).toHaveProperty("files");
+      expect(siteManifest).toHaveProperty("stats");
+      expect(siteManifest.stats.totalFiles).toBeGreaterThan(0);
+    }, 60_000);
+
+    it("--download-assets --crawl wires sharedAssetsDir to per-page manifests", async () => {
+      // Reuse the output from the previous crawl test
+      const outDir = join(TEST_DIR, "shared-crawl");
+      // Find a per-page assets/manifest.json (the seed page slug is the hostname)
+      const seedPageManifest = join(outDir, "127.0.0.1", "assets", "manifest.json");
+      expect(existsSync(seedPageManifest)).toBe(true);
+      const perPage = JSON.parse(await readFile(seedPageManifest, "utf-8"));
+      // Per-page manifest must have deduped flag and sharedDir reference
+      expect(perPage.deduped).toBe(true);
+      expect(perPage.sharedDir).toBeDefined();
+      expect(perPage.assets).toBeDefined();
+    }, 10_000);
 
     it("uses correct viewport", async () => {
       const outDir = join(TEST_DIR, "viewport");
