@@ -157,7 +157,7 @@ export async function startTestServer() {
           { id: 1, name: "Assets" },
           { id: 2, name: "Images" },
         ] }));
-      } else if (body.includes("source%2Fget") || body.includes("action=source/get")) {
+      } else if ((body.includes("source%2Fget&") || body.includes("action=source/get&")) && !body.includes("getlist")) {
         // CMS-8: Get media source properties
         const idMatch = body.match(/id=(\d+)/);
         const sourceId = idMatch ? parseInt(idMatch[1]) : 1;

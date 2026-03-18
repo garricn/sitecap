@@ -222,9 +222,9 @@ assert manifest.sources[0].baseUrl === "/assets/"
 
 **MODX file download:**
 ```
-assert existsSync(join(outDir, "cms-media/modx/1/images/hero.jpg"))
+assert existsSync(join(outDir, manifest.files[0].localPath))
 assert manifest.files.length >= 1
-assert manifest.files[0].localPath === "cms-media/modx/1/images/hero.jpg"
+assert manifest.files[0].localPath matches /^cms-media\/modx\/\d+\//  (source assigned by longest-prefix match)
 assert manifest.stats.downloaded >= 1
 assert manifest.stats.errors === 0
 ```
