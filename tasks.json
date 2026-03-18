@@ -402,7 +402,7 @@
           "tasks": [
             {
               "id": "CMS-9",
-              "task": "Cross-reference TV file refs vs downloaded assets — produce coverage report showing which image/file TVs have local copies and which are missing",
+              "task": "Cross-reference TV file refs vs downloaded assets — produce coverage report showing which image/file TVs have local copies and which are missing. Plan: tasks/active/cms-9-media-coverage-2026-03-18.md",
               "owner": "--",
               "depends": ["CMS-7", "CMS-8"],
               "status": "pending",
