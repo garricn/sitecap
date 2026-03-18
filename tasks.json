@@ -189,6 +189,20 @@
       ]
     },
     {
+      "name": "API",
+      "prefix": "API",
+      "tasks": [
+        {
+          "id": "API-1",
+          "task": "Return capture duration from capturePage() — add duration_ms to meta object and meta.json",
+          "owner": "--",
+          "depends": [],
+          "status": "done",
+          "release": "--"
+        }
+      ]
+    },
+    {
       "name": "Demo",
       "prefix": "DEMO",
       "tasks": [

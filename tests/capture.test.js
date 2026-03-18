@@ -34,6 +34,7 @@ describe("capture", () => {
 
       expect(meta.url).toBe(`${baseUrl}/`);
       expect(meta.timestamp).toBeDefined();
+      expect(meta.duration_ms).toBeGreaterThanOrEqual(0);
       expect(meta.captures.screenshot).toContain("screenshot.png");
       expect(meta.captures.accessibility).toContain("accessibility.txt");
       expect(meta.captures.html).toContain("page-source.html");
