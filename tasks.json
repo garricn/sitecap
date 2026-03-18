@@ -380,18 +380,18 @@
           "tasks": [
             {
               "id": "CMS-4",
-              "task": "TV value extraction per resource — for CMS pages with structured fields (MODX TVs, WP ACF, Drupal fields), extract field values alongside rendered capture",
+              "task": "TV value extraction per resource — for CMS pages with structured fields (MODX TVs, WP ACF, Drupal fields), extract field values alongside rendered capture. Plan: tasks/active/cms-4-tv-extraction-2026-03-17.md",
               "owner": "--",
               "depends": ["CMS-2", "CMS-3"],
-              "status": "pending",
+              "status": "done",
               "release": "--"
             },
             {
               "id": "CMS-5",
-              "task": "Template dependency graph — parse CMS templates to map chunk/partial/include references. Output as dependency-graph.json for rebuild planning",
+              "task": "Template dependency graph — parse CMS templates to map chunk/partial/include references. Output as dependency-graph.json for rebuild planning. Plan: tasks/active/cms-5-template-graph-2026-03-17.md",
               "owner": "--",
               "depends": ["CMS-2", "CMS-3"],
-              "status": "pending",
+              "status": "done",
               "release": "--"
             }
           ]
@@ -404,10 +404,10 @@
       "tasks": [
         {
           "id": "ASSET-1",
-          "task": "Add --download-assets flag to save CSS/JS/images/fonts from network.json to assets/ dir alongside captures. Rewrite URLs in page-source.html to local paths",
+          "task": "Add --download-assets flag to save CSS/JS/images/fonts from network.json to assets/ dir alongside captures. Rewrite URLs in page-source.html to local paths. Plan: tasks/active/asset-1-download-assets-2026-03-17.md",
           "owner": "--",
           "depends": [],
-          "status": "pending",
+          "status": "done",
           "release": "--"
         },
         {

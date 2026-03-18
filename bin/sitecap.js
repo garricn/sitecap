@@ -85,6 +85,7 @@ const { values, positionals } = parseArgs({
     "network-filter": { type: "string", default: "all" },
     video: { type: "boolean", default: false },
     "session-video": { type: "boolean", default: false },
+    "download-assets": { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -121,6 +122,7 @@ Options:
   --network-filter <mode>  Network capture: all (default), xhr (API only), none
   --video                  Record per-page video clips (off by default)
   --session-video          Record one continuous video across all pages
+  --download-assets        Download CSS/JS/images/fonts to assets/ dir
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
 
@@ -390,6 +392,7 @@ async function worker() {
       const meta = await navigateAndCapture(activePage, target.url, pageDir, {
         types,
         networkFilter: values["network-filter"],
+        downloadAssets: values["download-assets"],
       });
 
       if (meta.errors) {
