@@ -179,9 +179,9 @@ If merge conflicts arise in shared files, they'll be trivially additive (new rou
 ---
 
 ## Before closing
-- [ ] Run `make check` (lint + typecheck + tests pass)
-- [ ] Re-read each task description and locate the code that implements it
-- [ ] For CMS-6: verify no `.slice()` remains on resources array
-- [ ] For CMS-7: verify file/image TVs are populated, text TVs are not overwritten
-- [ ] For CMS-10: verify integer ACF values are resolved, non-integer values are unchanged
-- [ ] Verify all new mock routes return realistic data shapes
+- [x] Run `make check` (lint + typecheck + tests pass) — 85/85 pass
+- [x] Re-read each task description and locate the code that implements it
+- [x] For CMS-6: verify no `.slice()` remains on resources array — removed, batched processing added
+- [x] For CMS-7: verify file/image TVs are populated, text TVs are not overwritten — tested
+- [x] For CMS-10: verify integer ACF values are resolved, non-integer values are unchanged — tested
+- [x] Verify all new mock routes return realistic data shapes — 150 resources, media endpoint, MODx.load() HTML

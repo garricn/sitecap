@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { detectCms, extractCmsStructure, buildDependencyGraph } from "../lib/cms.js";
 import { navigateAndCapture } from "../lib/capture.js";
 import { startTestServer } from "./helpers/server.js";
+import { parseModxLoadBlock } from "../lib/cms/modx.js";
 
 const TEST_DIR = "/tmp/sitecap-test-cms";
 
@@ -108,6 +109,35 @@ describe("CMS detection", () => {
       expect(result.pages[0].fields).toBeDefined();
     });
 
+    it("resolves ACF integer fields to media objects", async () => {
+      await page.goto(`${baseUrl}/wordpress`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      const hero = result.posts[0].fields.hero_image;
+      expect(hero).toEqual({
+        id: 123,
+        url: expect.stringContaining("/wp-content/uploads/hero.jpg"),
+        mime: "image/jpeg",
+        alt: "Hero image",
+        width: 1200,
+        height: 800,
+      });
+    });
+
+    it("leaves 404 media references as integers", async () => {
+      await page.goto(`${baseUrl}/wordpress`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      expect(result.posts[0].fields.missing_ref).toBe(999);
+    });
+
+    it("preserves string ACF field values unchanged", async () => {
+      await page.goto(`${baseUrl}/wordpress`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      expect(result.posts[0].fields.hero_text).toBe("Welcome");
+    });
+
     it("extracts MODX templates/chunks with TV fields on admin page", async () => {
       await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
       const detection = await detectCms(page, []);
@@ -120,6 +150,47 @@ describe("CMS detection", () => {
       expect(result.resources[0].fields).toBeDefined();
       expect(result.resources[0].fields.hero_image).toBe("/assets/hero.jpg");
     });
+
+    it("handles >100 resources without cap (CMS-6)", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      // Server returns 150 resources — all should be processed
+      expect(result.resources.length).toBe(150);
+      // Verify TV values were fetched for all resources (not just first 100)
+      expect(result.resources[149].fields).toBeDefined();
+      expect(result.resources[149].fields.hero_image).toBeDefined();
+    }, 30000);
+
+    it("includes tvStats in result (CMS-6)", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      expect(result.tvStats).toBeDefined();
+      expect(result.tvStats.totalResources).toBe(150);
+      expect(result.tvStats.tvsFetched).toBe(150);
+      expect(result.tvStats.tvErrors).toBe(0);
+    }, 30000);
+
+    it("populates image/file TVs from MODx.load() when connector returns empty (CMS-7)", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      // Resource ID 2 (even) has empty hero_image from connector — MODx.load() should fill it
+      const resource2 = result.resources.find(r => r.id === 2);
+      expect(resource2.fields.hero_image).toBe("/assets/images/hero.jpg");
+      // sidebar_file is always empty from connector — should be filled by MODx.load()
+      expect(resource2.fields.sidebar_file).toBe("/assets/docs/guide.pdf");
+    }, 30000);
+
+    it("does NOT overwrite non-empty connector text values with MODx.load() (CMS-7)", async () => {
+      await page.goto(`${baseUrl}/modx-admin`, { waitUntil: "networkidle" });
+      const detection = await detectCms(page, []);
+      const result = await extractCmsStructure(page, detection);
+      // plain_text has "Connector text" from connector — should NOT be overwritten by "Hello from load"
+      const resource1 = result.resources.find(r => r.id === 1);
+      expect(resource1.fields.plain_text).toBe("Connector text");
+    }, 30000);
 
     it("returns extracted: false when not admin", async () => {
       await page.goto(`${baseUrl}/modx`, { waitUntil: "networkidle" });
@@ -136,6 +207,29 @@ describe("CMS detection", () => {
       const result = await extractCmsStructure(page, detection);
       expect(result.extracted).toBe(false);
       expect(result.reason).toContain("not yet implemented");
+    });
+  });
+
+  describe("parseModxLoadBlock", () => {
+    it("extracts TV values from MODx.load() HTML", () => {
+      const html = `<script>MODx.load({xtype:"modx-panel-resource",items:[{xtype:"modx-panel-resource-tv",items:[{"fieldLabel":"hero_image","name":"tv123","xtype":"modx-panel-tv-image","value":"/assets/hero.jpg"},{"fieldLabel":"sidebar","name":"tv456","xtype":"modx-panel-tv-file","value":"/docs/file.pdf"}]}]});</script>`;
+      const tvNames = new Set(["hero_image", "sidebar"]);
+      const result = parseModxLoadBlock(html, tvNames);
+      expect(result.hero_image).toBe("/assets/hero.jpg");
+      expect(result.sidebar).toBe("/docs/file.pdf");
+    });
+
+    it("returns empty object for empty input", () => {
+      expect(parseModxLoadBlock("", new Set(["foo"]))).toEqual({});
+      expect(parseModxLoadBlock(null, new Set(["foo"]))).toEqual({});
+      expect(parseModxLoadBlock("<html></html>", new Set())).toEqual({});
+    });
+
+    it("only extracts named TVs", () => {
+      const html = `<script>MODx.load({items:[{"fieldLabel":"hero_image","name":"tv1","value":"/img.jpg"},{"fieldLabel":"other","name":"tv2","value":"val"}]});</script>`;
+      const result = parseModxLoadBlock(html, new Set(["hero_image"]));
+      expect(result.hero_image).toBe("/img.jpg");
+      expect(result.other).toBeUndefined();
     });
   });
 
