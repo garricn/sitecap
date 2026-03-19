@@ -472,14 +472,6 @@
       "prefix": "EXT",
       "tasks": [
         {
-          "id": "EXT-1",
-          "task": "Chrome extension bridge — authenticated capture via extension inside running Chrome, no profile corruption. Plan: tasks/active/EXT-1-chrome-extension.md",
-          "owner": "--",
-          "depends": [],
-          "status": "in-progress",
-          "release": "--"
-        },
-        {
           "id": "EXT-2",
           "task": "Native Messaging bridge — replace WebSocket with chrome.runtime.connectNative for zero-config, zero-click CLI↔extension communication. Add `sitecap install-extension` command to register native host manifest.",
           "owner": "--",
