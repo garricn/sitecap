@@ -72,7 +72,10 @@
                   "id": "CORE-5",
                   "task": "Add --crawl flag with BFS link extraction from rendered DOM. --max-depth N, --max-pages N. Same-origin only",
                   "owner": "--",
-                  "depends": ["CORE-2", "CORE-3"],
+                  "depends": [
+                    "CORE-2",
+                    "CORE-3"
+                  ],
                   "status": "done",
                   "release": "v0.3.0"
                 }
@@ -120,7 +123,9 @@
                   "id": "CORE-8",
                   "task": "Add --filter regex for crawl URL include/exclude patterns (e.g., --filter '/docs/*' --exclude '/api/*')",
                   "owner": "--",
-                  "depends": ["CORE-5"],
+                  "depends": [
+                    "CORE-5"
+                  ],
                   "status": "done",
                   "release": "v0.4.0"
                 }
@@ -136,7 +141,9 @@
               "id": "CORE-12",
               "task": "Session video: continuous recording across full capture run + createSession() API for sitetest. Closes #26. Plan: tasks/active/core-12-session-video-2026-03-16.md",
               "owner": "--",
-              "depends": ["CORE-11"],
+              "depends": [
+                "CORE-11"
+              ],
               "status": "done",
               "release": "v0.9.0"
             }
@@ -246,7 +253,9 @@
           "id": "AUTH-2",
           "task": "Add --auto-auth google: automate Google OAuth flow — detect sign-in button, click, select account in popup, wait for redirect. Closes #14. Plan: tasks/active/AUTH-2-auto-auth.md",
           "owner": "--",
-          "depends": ["AUTH-1"],
+          "depends": [
+            "AUTH-1"
+          ],
           "status": "done",
           "release": "v0.7.0"
         },
@@ -273,6 +282,22 @@
           "depends": [],
           "status": "done",
           "release": "--"
+        },
+        {
+          "id": "AUTH-6",
+          "task": "--wait-for-auth hangs when already authenticated (no redirect to detect). Detect logged-in state or add timeout + fallback to stdin confirmation",
+          "owner": "--",
+          "depends": [],
+          "status": "pending",
+          "release": "--"
+        },
+        {
+          "id": "AUTH-7",
+          "task": "--profile should support concurrent Chrome use. Export cookies from profile to temp JSON, launch separate Chromium with --auth, leave user's Chrome untouched",
+          "owner": "--",
+          "depends": [],
+          "status": "pending",
+          "release": "--"
         }
       ]
     },
@@ -296,7 +321,9 @@
               "id": "INT-2",
               "task": "MCP server — expose sitecap as tools (capture, diff, crawl) for Claude Code and agent workflows",
               "owner": "--",
-              "depends": ["INT-1"],
+              "depends": [
+                "INT-1"
+              ],
               "status": "done",
               "release": "v0.6.0"
             }
@@ -310,7 +337,9 @@
               "id": "INT-3",
               "task": "REST API — HTTP server with POST /capture, POST /diff, POST /crawl endpoints for cross-language consumption",
               "owner": "--",
-              "depends": ["INT-1"],
+              "depends": [
+                "INT-1"
+              ],
               "status": "done",
               "release": "v0.6.0"
             },
@@ -318,7 +347,9 @@
               "id": "INT-4",
               "task": "Skill.md — /capture slash command for Claude Code",
               "owner": "--",
-              "depends": ["INT-1"],
+              "depends": [
+                "INT-1"
+              ],
               "status": "done",
               "release": "v0.6.0"
             }
@@ -332,7 +363,11 @@
               "id": "INT-5",
               "task": "Schema-driven API codegen — defineOp() + Zod schemas → generate MCP, REST, OpenAPI, tools.json from single source. Plan: tasks/active/INT-5-api-codegen.md",
               "owner": "--",
-              "depends": ["INT-1", "INT-2", "INT-3"],
+              "depends": [
+                "INT-1",
+                "INT-2",
+                "INT-3"
+              ],
               "status": "done",
               "release": "v0.7.0"
             }
@@ -360,7 +395,9 @@
               "id": "CMS-2",
               "task": "MODX adapter — if admin session active, extract templates/chunks/snippets/plugins/TVs/resources via /connectors/index.php API. Write cms.json per site. Plan: tasks/active/cms-2-3-cms-adapters-2026-03-17.md",
               "owner": "--",
-              "depends": ["CMS-1"],
+              "depends": [
+                "CMS-1"
+              ],
               "status": "done",
               "release": "--"
             },
@@ -368,7 +405,9 @@
               "id": "CMS-3",
               "task": "WordPress adapter — if admin session active, extract themes/templates/posts/pages/CPTs/ACF fields via /wp-json/wp/v2/ REST API. Write cms.json per site. Plan: tasks/active/cms-2-3-cms-adapters-2026-03-17.md",
               "owner": "--",
-              "depends": ["CMS-1"],
+              "depends": [
+                "CMS-1"
+              ],
               "status": "done",
               "release": "--"
             }
@@ -382,7 +421,10 @@
               "id": "CMS-4",
               "task": "TV value extraction per resource — for CMS pages with structured fields (MODX TVs, WP ACF, Drupal fields), extract field values alongside rendered capture. Plan: tasks/active/cms-4-tv-extraction-2026-03-17.md",
               "owner": "--",
-              "depends": ["CMS-2", "CMS-3"],
+              "depends": [
+                "CMS-2",
+                "CMS-3"
+              ],
               "status": "done",
               "release": "--"
             },
@@ -390,7 +432,10 @@
               "id": "CMS-5",
               "task": "Template dependency graph — parse CMS templates to map chunk/partial/include references. Output as dependency-graph.json for rebuild planning. Plan: tasks/active/cms-5-template-graph-2026-03-17.md",
               "owner": "--",
-              "depends": ["CMS-2", "CMS-3"],
+              "depends": [
+                "CMS-2",
+                "CMS-3"
+              ],
               "status": "done",
               "release": "--"
             }
@@ -414,7 +459,9 @@
           "id": "ASSET-2",
           "task": "Deduplicate shared assets across pages — single assets/ dir at site root with content-hash filenames. Plan: tasks/active/asset-2-dedup-assets-2026-03-17.md",
           "owner": "--",
-          "depends": ["ASSET-1"],
+          "depends": [
+            "ASSET-1"
+          ],
           "status": "done",
           "release": "--"
         }
@@ -429,7 +476,7 @@
           "task": "Chrome extension bridge — authenticated capture via extension inside running Chrome, no profile corruption. Plan: tasks/active/EXT-1-chrome-extension.md",
           "owner": "--",
           "depends": [],
-          "status": "pending",
+          "status": "in-progress",
           "release": "--"
         }
       ]
