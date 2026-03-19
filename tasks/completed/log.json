@@ -53,5 +53,11 @@
     "task": "Add --dry-run flag for crawl + inventory without captures",
     "status": "done",
     "date": "2026-03-18"
+  },
+  {
+    "id": "EXT-1",
+    "task": "Chrome extension bridge — authenticated capture via extension inside running Chrome, no profile corruption",
+    "status": "done",
+    "date": "2026-03-19"
   }
 ]
