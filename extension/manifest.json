@@ -16,6 +16,9 @@
   "background": {
     "service_worker": "service-worker.js"
   },
+  "action": {
+    "default_title": "Click to connect sitecap CLI"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

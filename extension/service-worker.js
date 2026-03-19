@@ -10,7 +10,6 @@
  */
 
 const DEFAULT_PORT = 9333;
-const RECONNECT_DELAY_MS = 3000;
 
 let ws = null;
 let debugTargets = new Map(); // tabId → true (tracks which tabs we've attached debugger to)
@@ -24,6 +23,8 @@ function connect(port = DEFAULT_PORT) {
 
   ws.onopen = () => {
     console.log(`[sitecap] connected to CLI on port ${port}`);
+    chrome.action.setBadgeText({ text: "ON" });
+    chrome.action.setBadgeBackgroundColor({ color: "#4CAF50" });
     ws.send(JSON.stringify({ type: "hello", version: "0.1.0" }));
   };
 
@@ -40,12 +41,12 @@ function connect(port = DEFAULT_PORT) {
 
   ws.onclose = () => {
     ws = null;
-    setTimeout(() => connect(port), RECONNECT_DELAY_MS);
+    chrome.action.setBadgeText({ text: "" });
   };
 
   ws.onerror = () => {
-    // Suppress connection refused errors — CLI may not be running yet.
-    // The reconnect loop will retry silently every 3s.
+    chrome.action.setBadgeText({ text: "ERR" });
+    chrome.action.setBadgeBackgroundColor({ color: "#F44336" });
     ws.close();
   };
 }
@@ -224,6 +225,8 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   }
 });
 
-// --- Start ---
+// --- Connect on click (no auto-connect, no noisy reconnect loop) ---
 
-connect();
+chrome.action.onClicked.addListener(() => {
+  connect();
+});
