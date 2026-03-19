@@ -129,12 +129,22 @@ async function handleTabsClose(params) {
 
 async function handleTabsNavigate(params) {
   const { tabId, url } = params;
+  const NAV_TIMEOUT_MS = 30_000;
   await chrome.tabs.update(tabId, { url });
 
-  // Wait for the tab to finish loading
-  return new Promise((resolve) => {
+  // Wait for the tab to finish loading (with timeout)
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      // Resolve with current state rather than hanging forever
+      chrome.tabs.get(tabId).then((tab) => {
+        resolve({ tabId: tab.id, url: tab.url, title: tab.title, timedOut: true });
+      }).catch(() => reject(new Error(`Navigation to ${url} timed out after ${NAV_TIMEOUT_MS / 1000}s`)));
+    }, NAV_TIMEOUT_MS);
+
     function listener(updatedTabId, changeInfo) {
       if (updatedTabId === tabId && changeInfo.status === "complete") {
+        clearTimeout(timer);
         chrome.tabs.onUpdated.removeListener(listener);
         chrome.tabs.get(tabId).then((tab) => {
           resolve({ tabId: tab.id, url: tab.url, title: tab.title });
@@ -203,6 +213,14 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   if (source.tabId) {
     debugTargets.delete(source.tabId);
     send({ type: "event", event: "debugger.detached", tabId: source.tabId, reason });
+  }
+});
+
+// --- CDP event forwarding ---
+
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (source.tabId) {
+    send({ type: "event", event: "cdp", tabId: source.tabId, method, params });
   }
 });
 
