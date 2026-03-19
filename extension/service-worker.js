@@ -39,13 +39,13 @@ function connect(port = DEFAULT_PORT) {
   };
 
   ws.onclose = () => {
-    console.log("[sitecap] disconnected from CLI, reconnecting...");
     ws = null;
     setTimeout(() => connect(port), RECONNECT_DELAY_MS);
   };
 
-  ws.onerror = (err) => {
-    console.error("[sitecap] WebSocket error:", err.message || err);
+  ws.onerror = () => {
+    // Suppress connection refused errors — CLI may not be running yet.
+    // The reconnect loop will retry silently every 3s.
     ws.close();
   };
 }
