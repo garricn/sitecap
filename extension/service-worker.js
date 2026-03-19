@@ -10,6 +10,7 @@
  */
 
 const DEFAULT_PORT = 9333;
+const RECONNECT_DELAY_MS = 3000;
 
 let ws = null;
 let debugTargets = new Map(); // tabId → true (tracks which tabs we've attached debugger to)
@@ -42,11 +43,12 @@ function connect(port = DEFAULT_PORT) {
   ws.onclose = () => {
     ws = null;
     chrome.action.setBadgeText({ text: "" });
+    setTimeout(() => connect(port), RECONNECT_DELAY_MS);
   };
 
   ws.onerror = () => {
-    chrome.action.setBadgeText({ text: "ERR" });
-    chrome.action.setBadgeBackgroundColor({ color: "#F44336" });
+    // Connection refused errors are expected when CLI isn't running.
+    // The reconnect loop retries silently every 3s.
     ws.close();
   };
 }
@@ -225,8 +227,9 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   }
 });
 
-// --- Connect on click (no auto-connect, no noisy reconnect loop) ---
+// --- Start (auto-connect with silent retry) ---
+// Connection refused errors are Chrome-level logs visible only in the
+// extension's service worker DevTools — normal users never see them.
+// Long-term fix: migrate to Native Messaging (see EXT-2).
 
-chrome.action.onClicked.addListener(() => {
-  connect();
-});
+connect();

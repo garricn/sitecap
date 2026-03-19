@@ -478,6 +478,14 @@
           "depends": [],
           "status": "in-progress",
           "release": "--"
+        },
+        {
+          "id": "EXT-2",
+          "task": "Native Messaging bridge — replace WebSocket with chrome.runtime.connectNative for zero-config, zero-click CLI↔extension communication. Add `sitecap install-extension` command to register native host manifest.",
+          "owner": "--",
+          "depends": ["EXT-1"],
+          "status": "backlog",
+          "release": "--"
         }
       ]
     },
