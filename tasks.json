@@ -421,6 +421,20 @@
       ]
     },
     {
+      "name": "Extension",
+      "prefix": "EXT",
+      "tasks": [
+        {
+          "id": "EXT-1",
+          "task": "Chrome extension bridge — authenticated capture via extension inside running Chrome, no profile corruption. Plan: tasks/active/EXT-1-chrome-extension.md",
+          "owner": "--",
+          "depends": [],
+          "status": "pending",
+          "release": "--"
+        }
+      ]
+    },
+    {
       "name": "Deep Capture",
       "prefix": "DEEP",
       "waves": [

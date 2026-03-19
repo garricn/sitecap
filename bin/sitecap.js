@@ -88,6 +88,8 @@ const { values, positionals } = parseArgs({
     "download-assets": { type: "boolean", default: false },
     "download-media": { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
+    extension: { type: "boolean", default: false },
+    "extension-port": { type: "string", default: "9333" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -126,6 +128,8 @@ Options:
   --session-video          Record one continuous video across all pages
   --download-assets        Download CSS/JS/images/fonts to assets/ dir
   --download-media         Download CMS media files (requires -t cms)
+  --extension              Connect via sitecap Chrome extension (uses your running Chrome, inherits auth)
+  --extension-port <port>  WebSocket port for extension bridge (default: 9333)
   --dry-run                Crawl + discover URLs without capturing. Output inventory JSON to stdout
   -m, --manifest <file>    JSON manifest of URLs to capture
   -h, --help               Show this help
@@ -230,8 +234,21 @@ if (values["session-video"] && concurrency > 1) {
 // Connect or launch Chrome
 let browser;
 let profileContext = null;
+let extensionBridge = null;
 
-if (values.profile) {
+if (values.extension) {
+  // Extension mode — connect to running Chrome via sitecap extension
+  const { createExtensionBridge } = await import("../lib/extension.js");
+  const extPort = parseInt(values["extension-port"], 10);
+  log(`Waiting for sitecap extension on port ${extPort}...`);
+  try {
+    extensionBridge = await createExtensionBridge({ port: extPort, log });
+    log("Extension connected.");
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+} else if (values.profile) {
   // Launch Chrome with profile via Playwright persistent context
   const userDataDir = values["user-data-dir"] || findUserDataDir();
   const profileDir = await resolveProfileDir(userDataDir, values.profile);
@@ -293,10 +310,11 @@ if (values.profile) {
 }
 
 const sessionVideoOpts = values["session-video"] ? { recordVideo: { dir: outDir } } : {};
-const context = profileContext || browser.contexts()[0] || await browser.newContext(sessionVideoOpts);
+const context = extensionBridge ? null : (profileContext || browser.contexts()[0] || await browser.newContext(sessionVideoOpts));
 
 // Load auth state (cookies/storage) if provided
-if (values.auth) {
+// (Skipped in extension mode — auth is inherited from the running Chrome session)
+if (values.auth && !extensionBridge) {
   const authData = JSON.parse(await readFile(resolve(values.auth), "utf-8"));
   if (authData.cookies && authData.cookies.length > 0) {
     await context.addCookies(authData.cookies);
@@ -308,8 +326,8 @@ if (values.auth) {
   }
 }
 
-// Run auth flow if provided
-if (values["auth-flow"]) {
+// Run auth flow if provided (skipped in extension mode)
+if (values["auth-flow"] && !extensionBridge) {
   const { runAuthFlow } = await import("../lib/auth.js");
   const authPage = await context.newPage();
   await authPage.setViewportSize(viewport);
@@ -335,8 +353,8 @@ if (values["auth-flow"]) {
   }
 }
 
-// Run exploration flow if provided
-if (values.explore) {
+// Run exploration flow if provided (skipped in extension mode)
+if (values.explore && !extensionBridge) {
   const { runAuthFlow } = await import("../lib/auth.js");
   const explorePage = await context.newPage();
   await explorePage.setViewportSize(viewport);
@@ -518,7 +536,13 @@ let nextIndex = 0;
 let totalEnqueued = queue.length;
 
 async function worker() {
-  const page = values.video ? null : await context.newPage();
+  let page;
+  if (extensionBridge) {
+    const { createExtensionPage } = await import("../lib/extension-page.js");
+    page = await createExtensionPage(extensionBridge, { viewport });
+  } else {
+    page = values.video ? null : await context.newPage();
+  }
   if (page) await page.setViewportSize(viewport);
 
   while (nextIndex < queue.length) {
@@ -529,9 +553,10 @@ async function worker() {
     log(`${label} ${target.url}${crawl ? ` (depth ${target.depth})` : ""}`);
 
     // For video: create a fresh context+page per URL so each gets its own recording
+    // (Not supported in extension mode — use regular modes for video)
     let activePage = page;
     let videoCtx = null;
-    if (values.video) {
+    if (values.video && !extensionBridge) {
       const { mkdir: mkdirSync } = await import("node:fs/promises");
       await mkdirSync(pageDir, { recursive: true });
       videoCtx = await browser.newContext({
@@ -640,7 +665,7 @@ if (sharedAssetsDir) {
 
 // Finalize session video — get video path before closing context
 let sessionVideoSrc = null;
-if (values["session-video"]) {
+if (values["session-video"] && context) {
   const pages = context.pages();
   if (pages.length > 0 && pages[0].video()) {
     sessionVideoSrc = await pages[0].video().path();
@@ -648,7 +673,10 @@ if (values["session-video"]) {
 }
 
 // Cleanup
-if (profileContext) {
+if (extensionBridge) {
+  await extensionBridge.close();
+  log("Extension bridge closed.");
+} else if (profileContext) {
   if (values["close-after"]) {
     await shutdownChrome(profileContext);
     log("Chrome closed.");
