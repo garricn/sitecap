@@ -80,6 +80,9 @@ async function handleMessage(msg) {
       case "tabs.create":
         return reply(id, await handleTabsCreate(params));
 
+      case "tabs.find":
+        return reply(id, await handleTabsFind(params));
+
       case "tabs.close":
         return reply(id, await handleTabsClose(params));
 
@@ -114,6 +117,19 @@ async function handleTabsCreate(params) {
     active: params.active !== false,
   });
   return { tabId: tab.id, url: tab.url };
+}
+
+async function handleTabsFind(params) {
+  const { url } = params;
+  // Query for tabs matching this URL (ignores fragment)
+  const tabs = await chrome.tabs.query({ url: url + "*" });
+  // Prefer exact match, then prefix match
+  const exact = tabs.find((t) => t.url === url || t.url === url + "/");
+  const match = exact || tabs[0];
+  if (match) {
+    return { found: true, tabId: match.id, url: match.url, title: match.title };
+  }
+  return { found: false };
 }
 
 async function handleTabsClose(params) {
