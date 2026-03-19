@@ -48,8 +48,8 @@ function connect(port = DEFAULT_PORT) {
 
   ws.onerror = () => {
     // Connection refused errors are expected when CLI isn't running.
-    // The reconnect loop retries silently every 3s.
-    ws.close();
+    // Don't call ws.close() here — browser auto-closes after error per
+    // WebSocket spec, and explicit close would double-fire onclose.
   };
 }
 
