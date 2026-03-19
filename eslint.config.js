@@ -22,10 +22,11 @@ export default [
         performance: "readonly",
         fetch: "readonly",
         window: "readonly",
+        Buffer: "readonly",
       },
     },
   },
   {
-    ignores: ["node_modules/", "output/"],
+    ignores: ["node_modules/", "output/", "extension/"],
   },
 ];
