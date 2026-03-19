@@ -1,6 +1,6 @@
 # sitecap
 
-Exhaustive web page capture tool. Connects to your running Chrome (inheriting all logged-in sessions) or auto-launches headless Chromium. Captures up to 9 data types per page into structured directories.
+Exhaustive web page capture tool. Captures up to 9 data types per page into structured directories. Connects to your running Chrome via extension (inheriting all auth/cookies) or auto-launches headless Chromium.
 
 ## Quick Start
 
@@ -14,23 +14,28 @@ npm install
 node bin/sitecap.js https://example.com --launch -o ./output
 ```
 
-### Authenticated sites
+### Authenticated sites (recommended)
 
-**Step 1 — One-time login (saves cookies):**
+**One-time setup:** Load the Chrome extension.
 
-```bash
-node bin/sitecap.js https://your-app.com/dashboard --profile Default --wait-for-auth
-# Chrome opens → log in however you need to (Google, email/password, 2FA, etc.)
-# sitecap detects the redirect and saves session cookies to ~/.sitecap/auth/
-```
+1. Open `chrome://extensions` → Enable Developer mode
+2. Click "Load unpacked" → select the `extension/` directory in this repo
 
-**Step 2 — Every subsequent run (headless, no browser window):**
+**Every run:**
 
 ```bash
-node bin/sitecap.js https://your-app.com/dashboard --launch --auth ~/.sitecap/auth/google-default.json -o ./output
+node bin/sitecap.js https://your-app.com/dashboard --extension -o ./output
 ```
 
-No Chrome profile needed. No modal. Fully automated.
+That's it. The extension runs inside your Chrome, inheriting all cookies, sessions, and login state. No profile corruption, no cookie export, no Chrome restart.
+
+### CI / headless (no extension)
+
+For CI pipelines where no browser is running, use `--launch` with exported cookies:
+
+```bash
+node bin/sitecap.js https://your-app.com/dashboard --launch --auth cookies.json -o ./output
+```
 
 ### Auth flows (advanced)
 
@@ -50,7 +55,7 @@ steps:
 ```
 
 ```bash
-node bin/sitecap.js https://your-app.com --profile Default --auth-flow auth/my-app.yaml -o ./output
+node bin/sitecap.js https://your-app.com --launch --auth-flow auth/my-app.yaml -o ./output
 ```
 
 ## Capture Types
@@ -76,10 +81,11 @@ MHTML and video are opt-in.
 
 ```
 -o, --output <dir>       Output directory (default: ./output)
--p, --port <port>        Chrome DevTools port (default: 9222)
 -t, --types <list>       Comma-separated capture types
 -v, --viewport <WxH>     Viewport size (default: 1280x720)
 -c, --concurrency <n>    Parallel tabs (default: 4)
+--extension              Connect via Chrome extension (inherits auth, recommended)
+--extension-port <port>  WebSocket port for extension bridge (default: 9333)
 --launch                 Auto-launch headless Chrome (clean session)
 --crawl                  Crawl same-origin links from captured pages
 --max-depth <n>          Max crawl depth (default: 3)

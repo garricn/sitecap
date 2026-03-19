@@ -486,6 +486,38 @@
           "depends": ["EXT-1"],
           "status": "backlog",
           "release": "--"
+        },
+        {
+          "id": "EXT-3",
+          "task": "Cookie export via extension — `sitecap auth export --extension` dumps authenticated cookies to JSON for CI headless runs. No manual cookie wrangling.",
+          "owner": "--",
+          "depends": ["EXT-1"],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "EXT-4",
+          "task": "Live watch mode — `--watch` keeps extension connected, re-captures on interval or DOM mutation, auto-diffs against previous capture.",
+          "owner": "--",
+          "depends": ["EXT-1"],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "EXT-5",
+          "task": "Interaction capture — `--flow steps.yaml` drives click/fill/navigate via extension chrome.debugger, captures each state. Extension-native alternative to --auth-flow.",
+          "owner": "--",
+          "depends": ["EXT-1"],
+          "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "EXT-6",
+          "task": "Move extension to sitedom — extract extension/ to ../sitedom/extension/ as shared infrastructure for all site* tools. sitecap depends on it as a package.",
+          "owner": "--",
+          "depends": ["EXT-2"],
+          "status": "backlog",
+          "release": "--"
         }
       ]
     },
