@@ -529,7 +529,22 @@ if (values.explore) {
     const { createExtensionPage } = await import("../lib/extension-page.js");
     explorePage = await createExtensionPage(extensionBridge, { viewport });
     await explorePage.goto(exploreTarget);
-    await explorePage.waitForLoadState().catch(() => {});
+    // Wait for SPA to render — waitForLoadState alone isn't enough for SPAs
+    if (values["wait-for-text"]) {
+      const textTimeout = values["settle-timeout"] ? parseInt(values["settle-timeout"], 10) : 10_000;
+      await explorePage.waitForFunction(
+        (text) => document.body && document.body.innerText.includes(text),
+        values["wait-for-text"],
+        { timeout: textTimeout },
+      ).catch(() => {});
+    }
+    const waitMs = values.wait ? parseInt(values.wait, 10) : undefined;
+    if (waitMs && waitMs > 0) {
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+    await waitForPageSettle(explorePage, {
+      maxTimeout: values["settle-timeout"] ? parseInt(values["settle-timeout"], 10) : undefined,
+    }).catch(() => {});
     // Thin context adapter for extension mode
     exploreContext = {
       async cookies(url) { return explorePage.context().cookies(url); },
