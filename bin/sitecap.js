@@ -58,6 +58,118 @@ Options:
   process.exit(report.identical ? 0 : 1);
 }
 
+// Handle auth subcommand
+if (process.argv[2] === "auth" && process.argv[3] === "export") {
+  const args = process.argv.slice(4);
+  const useExtension = args.includes("--extension");
+  const portIdx = args.indexOf("--extension-port");
+  const extPort = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 9333;
+  const outIdx = args.indexOf("-o");
+  const outIdx2 = args.indexOf("--output");
+  const outFile = (outIdx !== -1 ? args[outIdx + 1] : null) || (outIdx2 !== -1 ? args[outIdx2 + 1] : null);
+  const domainIdx = args.indexOf("--domain");
+  const domain = domainIdx !== -1 ? args[domainIdx + 1] : undefined;
+
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`sitecap auth export — export cookies from your authenticated Chrome session
+
+Usage:
+  sitecap auth export --extension [-o cookies.json] [--domain example.com]
+
+Options:
+  --extension              Export via Chrome extension (required)
+  --extension-port <port>  WebSocket port (default: 9333)
+  --domain <domain>        Only export cookies for this domain
+  -o, --output <file>      Output file (default: stdout)
+  -h, --help               Show this help
+
+Then use the exported cookies for headless capture:
+  sitecap <url> --launch --auth cookies.json -o ./output
+`);
+    process.exit(0);
+  }
+
+  if (!useExtension) {
+    console.error("Error: sitecap auth export requires --extension");
+    process.exit(1);
+  }
+
+  const { createExtensionBridge } = await import("../lib/extension.js");
+  const { ExtensionPage } = await import("../lib/extension-page.js");
+  console.error("Waiting for sitecap extension...");
+  const bridge = await createExtensionBridge({ port: extPort, log: (...a) => console.error(...a) });
+
+  const params = {};
+  if (domain) params.domain = domain;
+  const { cookies } = await bridge.call("cookies.getAll", params);
+
+  // Convert Chrome cookies to Playwright-compatible format
+  const playwrightCookies = cookies.map((c) => ({
+    name: c.name,
+    value: c.value,
+    domain: c.domain,
+    path: c.path,
+    expires: c.expirationDate || -1,
+    httpOnly: c.httpOnly || false,
+    secure: c.secure || false,
+    sameSite: (c.sameSite === "strict" ? "Strict" : c.sameSite === "none" ? "None" : "Lax"),
+  }));
+
+  // Also capture localStorage/sessionStorage from the active tab (SPAs store auth here)
+  let origins = [];
+  const urlArg = args.find((a) => a.startsWith("https://") || a.startsWith("http://"));
+  if (urlArg || domain) {
+    const targetUrl = urlArg || `https://${domain}`;
+    try {
+      const found = await bridge.call("tabs.find", { url: targetUrl });
+      if (found.found) {
+        const page = new ExtensionPage(bridge, found.tabId);
+        const origin = new URL(found.url).origin;
+        const localStorage = await page.evaluate(() => {
+          const items = {};
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            items[key] = window.localStorage.getItem(key);
+          }
+          return items;
+        });
+        const sessionStorage = await page.evaluate(() => {
+          const items = {};
+          for (let i = 0; i < window.sessionStorage.length; i++) {
+            const key = window.sessionStorage.key(i);
+            items[key] = window.sessionStorage.getItem(key);
+          }
+          return items;
+        });
+        origins.push({ origin, localStorage, sessionStorage });
+        console.error(`Captured storage for ${origin} (${Object.keys(localStorage).length} localStorage, ${Object.keys(sessionStorage).length} sessionStorage keys)`);
+      }
+    } catch {
+      // Tab not found or storage extraction failed — cookies only
+    }
+  }
+
+  // Playwright storageState format: { cookies, origins }
+  const storageState = {
+    cookies: playwrightCookies,
+    origins,
+  };
+
+  const json = JSON.stringify(storageState, null, 2);
+
+  if (outFile) {
+    const { writeFile: wf } = await import("node:fs/promises");
+    await wf(resolve(outFile), json);
+    console.error(`Exported ${playwrightCookies.length} cookies + ${origins.length} origin(s) to ${outFile}`);
+  } else {
+    process.stdout.write(json + "\n");
+    console.error(`Exported ${playwrightCookies.length} cookies + ${origins.length} origin(s)`);
+  }
+
+  await bridge.close();
+  process.exit(0);
+}
+
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -88,6 +200,7 @@ const { values, positionals } = parseArgs({
     "download-assets": { type: "boolean", default: false },
     "download-media": { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
+    wait: { type: "string" },
     extension: { type: "boolean", default: false },
     "extension-port": { type: "string", default: "9333" },
     help: { type: "boolean", short: "h", default: false },
@@ -128,6 +241,7 @@ Options:
   --session-video          Record one continuous video across all pages
   --download-assets        Download CSS/JS/images/fonts to assets/ dir
   --download-media         Download CMS media files (requires -t cms)
+  --wait <ms>              Delay before capture (for iframe-heavy SPAs that need extra load time)
   --extension              Connect via sitecap Chrome extension (uses your running Chrome, inherits auth)
   --extension-port <port>  WebSocket port for extension bridge (default: 9333)
   --dry-run                Crawl + discover URLs without capturing. Output inventory JSON to stdout
@@ -157,6 +271,15 @@ Examples:
   sitecap -m manifest.json -o ./captures -t screenshot,accessibility
 `);
   process.exit(0);
+}
+
+// Validate --wait
+if (values.wait !== undefined) {
+  const waitMs = parseInt(values.wait, 10);
+  if (isNaN(waitMs) || waitMs < 0) {
+    console.error(`Error: --wait must be a non-negative number (got "${values.wait}")`);
+    process.exit(1);
+  }
 }
 
 const dryRun = values["dry-run"];
@@ -316,12 +439,41 @@ const context = extensionBridge ? null : (profileContext || browser.contexts()[0
 // (Skipped in extension mode — auth is inherited from the running Chrome session)
 if (values.auth && !extensionBridge) {
   const authData = JSON.parse(await readFile(resolve(values.auth), "utf-8"));
-  if (authData.cookies && authData.cookies.length > 0) {
-    await context.addCookies(authData.cookies);
-    log(`Loaded ${authData.cookies.length} cookies from ${values.auth}`);
+
+  // Support both formats: array of cookies (legacy) and storageState (new)
+  const cookies = Array.isArray(authData) ? authData : authData.cookies;
+  if (cookies && cookies.length > 0) {
+    await context.addCookies(cookies);
+    log(`Loaded ${cookies.length} cookies from ${values.auth}`);
   }
+
+  // Inject localStorage from storageState origins
+  if (authData.origins && authData.origins.length > 0) {
+    // Playwright's addInitScript runs before every page navigation
+    for (const { origin, localStorage: ls, sessionStorage: ss } of authData.origins) {
+      if (ls && Object.keys(ls).length > 0) {
+        await context.addInitScript({ content: `
+          if (window.location.origin === ${JSON.stringify(origin)}) {
+            const ls = ${JSON.stringify(ls)};
+            for (const [k, v] of Object.entries(ls)) window.localStorage.setItem(k, v);
+          }
+        `});
+        log(`Loaded ${Object.keys(ls).length} localStorage keys for ${origin}`);
+      }
+      if (ss && Object.keys(ss).length > 0) {
+        await context.addInitScript({ content: `
+          if (window.location.origin === ${JSON.stringify(origin)}) {
+            const ss = ${JSON.stringify(ss)};
+            for (const [k, v] of Object.entries(ss)) window.sessionStorage.setItem(k, v);
+          }
+        `});
+        log(`Loaded ${Object.keys(ss).length} sessionStorage keys for ${origin}`);
+      }
+    }
+  }
+
+  // Legacy format support
   if (authData.localStorage) {
-    // localStorage must be injected per-page after navigation, store for later
     context.__sitecapLocalStorage = authData.localStorage;
   }
 }
@@ -577,6 +729,7 @@ async function worker() {
         downloadAssets: values["download-assets"],
         downloadMedia: values["download-media"],
         sharedAssetsDir,
+        waitMs: values.wait ? parseInt(values.wait, 10) : undefined,
       });
 
       if (meta.errors) {
