@@ -37,6 +37,44 @@ For CI pipelines where no browser is running, use `--launch` with exported cooki
 node bin/sitecap.js https://your-app.com/dashboard --launch --auth cookies.json -o ./output
 ```
 
+### Cookie export for CI
+
+Export cookies + localStorage from your authenticated Chrome session:
+
+```bash
+node bin/sitecap.js auth export --extension -o auth.json
+node bin/sitecap.js https://your-app.com --launch --auth auth.json -o ./output
+```
+
+### Explore flows (click through SPAs)
+
+Capture each state of a multi-step SPA — tabs, sidebar sections, wizard steps:
+
+```bash
+# Auto-discover patterns on the page
+node bin/sitecap.js discover https://your-app.com/dashboard --extension
+
+# Or write a flow manually
+cat > explore.yaml << 'EOF'
+name: dashboard-sections
+steps:
+  - capture: initial
+  - foreach:
+      selector: ".sidebar-nav a"
+      parallel: true
+      steps:
+        - click: $element
+        - wait:
+            ms: 2000
+        - capture: section-{index}
+EOF
+
+# Run the explore flow
+node bin/sitecap.js https://your-app.com/dashboard --extension --explore explore.yaml -o ./output
+```
+
+`foreach` iterates DOM elements, clicking each and capturing the result. `parallel: true` distributes across multiple Chrome tabs (`--parallel N`, default 2).
+
 ### Auth flows (advanced)
 
 For complex login sequences, define steps in YAML:
@@ -92,7 +130,12 @@ MHTML and video are opt-in.
 --max-pages <n>          Max pages to crawl (default: 50)
 --filter <regex>         Only crawl URLs matching pattern
 --exclude <regex>        Skip URLs matching pattern
---auth <file>            Load cookies from JSON before capture
+--auth <file>            Load cookies/storage from JSON before capture
+--explore <file>         Run click-flow YAML (foreach/capture steps)
+--parallel <n>           Tabs for parallel foreach (default: 2, requires --extension)
+--wait <ms>              Delay before capture (for iframe-heavy SPAs)
+--settle-timeout <ms>    Max settle wait (default: 10000)
+--wait-for-text <text>   Wait for text in DOM before capturing
 --video                  Record page video (off by default)
 -m, --manifest <file>    JSON manifest of URLs to capture
 -h, --help               Show help
@@ -118,6 +161,12 @@ node bin/sitecap.js diff ./before/example.com ./after/example.com
 
 # Record video of page load
 node bin/sitecap.js https://example.com --video --launch
+
+# Auto-discover clickable patterns on a page
+node bin/sitecap.js discover https://your-app.com/editor --extension --wait-for-text "Steps"
+
+# Capture with longer settle for slow SPAs
+node bin/sitecap.js https://your-app.com --extension --settle-timeout 20000 --wait-for-text "Dashboard"
 ```
 
 ## Diff

@@ -12,7 +12,7 @@ Exhaustive web page capture tool. Connects to your running Chrome via CDP (inher
 ## Project Structure
 
 ```
-bin/sitecap.js        — CLI entry point (capture + diff subcommands)
+bin/sitecap.js        — CLI entry point (capture, diff, discover, auth export subcommands)
 bin/mcp-server.js     — MCP server (thin shell, imports generated/mcp-tools.js)
 bin/api-server.js     — REST API server (thin shell, imports generated/api-routes.js)
 lib/capture.js        — core capture logic (capturePage, navigateAndCapture, waitForPageSettle, extractLinks)
@@ -22,6 +22,7 @@ lib/browser.js        — browser lifecycle (createBrowser, createCaptureSession
 lib/extension.js      — CLI-side WebSocket server for extension bridge
 lib/extension-page.js — Playwright-compatible page adapter backed by extension CDP
 lib/url.js            — shared URL utilities (slugify, normalizeUrl)
+lib/discover.js       — SPA pattern detection + explore YAML generation
 lib/cms.js            — CMS auto-detection (WordPress, MODX, Drupal)
 lib/operations.js     — defineOp() + Zod schemas (SSoT for all API surfaces)
 lib/registry.js       — collects all operations for codegen
@@ -37,6 +38,9 @@ node bin/sitecap.js <url> --extension -o ./output        # capture via Chrome ex
 node bin/sitecap.js <url> --launch -o ./output           # auto-launch headless (clean session)
 node bin/sitecap.js <url> --launch --auth cookies.json   # headless with injected auth
 node bin/sitecap.js <url> --crawl --max-pages 20 --launch  # crawl site
+node bin/sitecap.js <url> --extension --explore flow.yaml -o ./output  # click-flow exploration
+node bin/sitecap.js discover <url> --extension            # auto-detect patterns → YAML
+node bin/sitecap.js auth export --extension -o auth.json  # export cookies + storage
 node bin/sitecap.js diff <dir-a> <dir-b>                 # compare captures
 make check                                               # lint + test
 ```
@@ -58,7 +62,7 @@ Five modes, in order of preference:
 | Authenticated site (dashboards, CMS admin) | `--extension` | Inherits your real Chrome session, zero setup |
 | Public site, CI/CD pipeline | `--launch` | Clean headless, no auth needed |
 | CI with auth | `--launch --auth cookies.json` | Headless + injected cookies |
-| One-time cookie export | `--extension` (future: `auth export`) | Then use cookies in CI with `--launch --auth` |
+| One-time cookie export | `sitecap auth export --extension` | Exports cookies + localStorage for CI with `--launch --auth` |
 
 ### Extension setup (one-time)
 
@@ -105,7 +109,12 @@ Opt-in: mhtml (`-t mhtml`), video (`--video`), cms (`-t cms`).
 ## Key Features
 
 - **Parallel capture**: `--concurrency N` (default 4) — N tabs in same browser context
-- **Dynamic page settle**: MutationObserver + PerformanceObserver (500ms quiet, 10s max)
+- **Dynamic page settle**: MutationObserver + PerformanceObserver (500ms quiet, 10s max), iframe-aware
+- **Settle tuning**: `--settle-timeout <ms>` overrides 10s max; `--wait-for-text <text>` waits for specific content before capturing
+- **Explore flows**: `--explore <yaml>` runs click-flow YAML (foreach, click, fill, wait, capture steps) — works with `--extension` for authenticated SPAs
+- **Parallel foreach**: `parallel: true` in explore YAML distributes iterations across N Chrome tabs (`--parallel N`, default 2)
+- **Discover**: `sitecap discover <url> --extension` analyzes the DOM for repeating interactive patterns and generates explore YAML
+- **Auth export**: `sitecap auth export --extension` dumps cookies + localStorage/sessionStorage in Playwright storageState format
 - **Crawl**: `--crawl` with `--max-depth`, `--max-pages`, `--filter`, `--exclude`
 - **Diff**: `sitecap diff <a> <b>` — pixel diff, a11y diff, network/console/storage diff
 - **Custom viewport**: `--viewport WxH` (default 1280x720)
