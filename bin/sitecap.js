@@ -314,6 +314,7 @@ const { values, positionals } = parseArgs({
     wait: { type: "string" },
     "settle-timeout": { type: "string" },
     "wait-for-text": { type: "string" },
+    parallel: { type: "string" },
     extension: { type: "boolean", default: false },
     "extension-port": { type: "string", default: "9333" },
     help: { type: "boolean", short: "h", default: false },
@@ -357,6 +358,7 @@ Options:
   --wait <ms>              Delay before capture (for iframe-heavy SPAs that need extra load time)
   --settle-timeout <ms>   Max settle wait time (default: 10000). Increase for slow SPAs
   --wait-for-text <text>  Wait for text to appear in DOM before capturing
+  --parallel <n>           Tabs for parallel foreach in explore YAML (default: 4, requires --extension)
   --extension              Connect via sitecap Chrome extension (uses your running Chrome, inherits auth)
   --extension-port <port>  WebSocket port for extension bridge (default: 9333)
   --dry-run                Crawl + discover URLs without capturing. Output inventory JSON to stdout
@@ -673,6 +675,8 @@ if (values.explore) {
   const success = await runAuthFlow(resolve(values.explore), explorePage, exploreContext, {
     outDir,
     types,
+    extensionBridge: extensionBridge || undefined,
+    parallel: values.parallel ? parseInt(values.parallel, 10) : undefined,
   });
 
   if (success) {
