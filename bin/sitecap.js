@@ -170,6 +170,117 @@ Then use the exported cookies for headless capture:
   process.exit(0);
 }
 
+// Handle discover subcommand
+if (process.argv[2] === "discover") {
+  const args = process.argv.slice(3);
+  const discoverUrl = args.find((a) => a.startsWith("https://") || a.startsWith("http://"));
+  const useExtension = args.includes("--extension");
+  const useLaunch = args.includes("--launch");
+  const portIdx = args.indexOf("--extension-port");
+  const extPort = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 9333;
+  const outIdx = args.indexOf("--output");
+  const outIdx2 = args.indexOf("-o");
+  const outFile = (outIdx !== -1 ? args[outIdx + 1] : null) || (outIdx2 !== -1 ? args[outIdx2 + 1] : null);
+  const minIdx = args.indexOf("--min-elements");
+  const minElements = minIdx !== -1 ? parseInt(args[minIdx + 1], 10) : 3;
+  const waitIdx = args.indexOf("--wait");
+  const discoverWait = waitIdx !== -1 ? parseInt(args[waitIdx + 1], 10) : undefined;
+  const stIdx = args.indexOf("--settle-timeout");
+  const settleTimeout = stIdx !== -1 ? parseInt(args[stIdx + 1], 10) : undefined;
+  const wftIdx = args.indexOf("--wait-for-text");
+  const waitForText = wftIdx !== -1 ? args[wftIdx + 1] : undefined;
+
+  if (args.includes("--help") || args.includes("-h") || !discoverUrl) {
+    console.log(`sitecap discover — analyze a page and generate explore YAML
+
+Usage:
+  sitecap discover <url> --extension [options]
+  sitecap discover <url> --launch [options]
+
+Options:
+  --extension              Analyze via Chrome extension (inherits auth)
+  --launch                 Auto-launch headless Chrome
+  --extension-port <port>  WebSocket port (default: 9333)
+  --settle-timeout <ms>    Wait for SPA to render (default: 10000)
+  --wait-for-text <text>   Wait for text before analyzing
+  --wait <ms>              Extra delay before analyzing
+  --min-elements <n>       Minimum elements for a pattern (default: 3)
+  -o, --output <file>      Write YAML to file (default: stdout)
+  -h, --help               Show this help
+
+Examples:
+  sitecap discover https://app.example.com/dashboard --extension
+  sitecap discover https://example.com --launch --min-elements 5
+  sitecap discover https://app.example.com --extension --wait-for-text "Funnel Steps" -o explore.yaml
+`);
+    process.exit(0);
+  }
+
+  if (!useExtension && !useLaunch) {
+    console.error("Error: sitecap discover requires --extension or --launch");
+    process.exit(1);
+  }
+
+  const { discoverPatterns, generateExploreYAML } = await import("../lib/discover.js");
+
+  let page;
+  let cleanup;
+
+  if (useExtension) {
+    const { createExtensionBridge } = await import("../lib/extension.js");
+    const { createExtensionPage } = await import("../lib/extension-page.js");
+    console.error("Waiting for sitecap extension...");
+    const bridge = await createExtensionBridge({ port: extPort, log: (...a) => console.error(...a) });
+    page = await createExtensionPage(bridge, {});
+    await page.goto(discoverUrl);
+    cleanup = async () => { await page.close(); await bridge.close(); };
+  } else {
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    page = await context.newPage();
+    await page.goto(discoverUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    cleanup = async () => { await browser.close(); };
+  }
+
+  // Wait for SPA to render
+  if (waitForText) {
+    const textTimeout = settleTimeout || 10_000;
+    await page.waitForFunction(
+      (text) => document.body && document.body.innerText.includes(text),
+      waitForText,
+      { timeout: textTimeout },
+    ).catch(() => {});
+  }
+  if (discoverWait && discoverWait > 0) {
+    await new Promise((r) => setTimeout(r, discoverWait));
+  }
+  await waitForPageSettle(page, { maxTimeout: settleTimeout }).catch(() => {});
+
+  console.error("Analyzing page...");
+  const patterns = await discoverPatterns(page, { minElements });
+
+  if (patterns.length === 0) {
+    console.error("No repeating patterns detected.");
+  } else {
+    console.error(`Found ${patterns.length} pattern(s):`);
+    for (const p of patterns.slice(0, 5)) {
+      console.error(`  ${p.count} elements: "${p.selector}" (score: ${p.score})`);
+    }
+  }
+
+  const yaml = generateExploreYAML(patterns, { url: discoverUrl, waitMs: 2000 });
+
+  if (outFile) {
+    await writeFile(resolve(outFile), yaml);
+    console.error(`Wrote explore YAML to ${outFile}`);
+  } else {
+    process.stdout.write(yaml);
+  }
+
+  await cleanup();
+  process.exit(0);
+}
+
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
