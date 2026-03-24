@@ -178,6 +178,20 @@
               "release": "v0.5.0"
             }
           ]
+        },
+        {
+          "id": "CORE-W6",
+          "parallelism": "PARA",
+          "tasks": [
+            {
+              "id": "CORE-15",
+              "task": "Add --settle-timeout and --wait-for-text flags for slow SPAs",
+              "owner": "--",
+              "depends": [],
+              "status": "pending",
+              "release": "--"
+            }
+          ]
         }
       ]
     },
@@ -509,6 +523,22 @@
           "owner": "--",
           "depends": ["EXT-2"],
           "status": "backlog",
+          "release": "--"
+        },
+        {
+          "id": "EXT-7",
+          "task": "Enable --explore with --extension mode — add locator interactions + page waits to ExtensionPage. Plan: tasks/active/EXT-7-explore-extension.md",
+          "owner": "--",
+          "depends": ["EXT-1"],
+          "status": "pending",
+          "release": "--"
+        },
+        {
+          "id": "EXT-8",
+          "task": "Add foreach step type to explore YAML — iterate DOM elements, click each, capture",
+          "owner": "--",
+          "depends": ["EXT-7"],
+          "status": "pending",
           "release": "--"
         }
       ]
