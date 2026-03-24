@@ -26,3 +26,7 @@ secrets.json
 
 # Claude Code local commands
 .claude/commands/
+
+# Tasks and plans
+tasks.json
+tasks/
