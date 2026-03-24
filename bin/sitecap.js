@@ -689,7 +689,7 @@ if (values.explore) {
     await explorePage.close();
     try { await (await import("node:fs/promises")).unlink(exploreVideoPath); } catch { /* video may not exist */ }
   } else {
-    await explorePage.close();
+    await explorePage.close().catch(() => {});
   }
 }
 
