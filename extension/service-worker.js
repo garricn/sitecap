@@ -122,7 +122,9 @@ async function handleTabsCreate(params) {
 async function handleTabsFind(params) {
   const { url } = params;
   // Query for tabs matching this URL (ignores fragment)
-  const tabs = await chrome.tabs.query({ url: url + "*" });
+  // chrome.tabs.query requires pattern like "https://example.com/*" — ensure trailing "/*"
+  const pattern = url.endsWith("/") ? url + "*" : url + "/*";
+  const tabs = await chrome.tabs.query({ url: pattern });
   // Prefer exact match, then prefix match
   const exact = tabs.find((t) => t.url === url || t.url === url + "/");
   const match = exact || tabs[0];

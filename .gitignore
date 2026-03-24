@@ -23,3 +23,6 @@ secrets.json
 .idea/
 *.swp
 *.swo
+
+# Claude Code local commands
+.claude/commands/
