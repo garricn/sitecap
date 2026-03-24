@@ -201,6 +201,8 @@ const { values, positionals } = parseArgs({
     "download-media": { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
     wait: { type: "string" },
+    "settle-timeout": { type: "string" },
+    "wait-for-text": { type: "string" },
     extension: { type: "boolean", default: false },
     "extension-port": { type: "string", default: "9333" },
     help: { type: "boolean", short: "h", default: false },
@@ -242,6 +244,8 @@ Options:
   --download-assets        Download CSS/JS/images/fonts to assets/ dir
   --download-media         Download CMS media files (requires -t cms)
   --wait <ms>              Delay before capture (for iframe-heavy SPAs that need extra load time)
+  --settle-timeout <ms>   Max settle wait time (default: 10000). Increase for slow SPAs
+  --wait-for-text <text>  Wait for text to appear in DOM before capturing
   --extension              Connect via sitecap Chrome extension (uses your running Chrome, inherits auth)
   --extension-port <port>  WebSocket port for extension bridge (default: 9333)
   --dry-run                Crawl + discover URLs without capturing. Output inventory JSON to stdout
@@ -278,6 +282,15 @@ if (values.wait !== undefined) {
   const waitMs = parseInt(values.wait, 10);
   if (isNaN(waitMs) || waitMs < 0) {
     console.error(`Error: --wait must be a non-negative number (got "${values.wait}")`);
+    process.exit(1);
+  }
+}
+
+// Validate --settle-timeout
+if (values["settle-timeout"] !== undefined) {
+  const st = parseInt(values["settle-timeout"], 10);
+  if (isNaN(st) || st < 0) {
+    console.error(`Error: --settle-timeout must be a non-negative number (got "${values["settle-timeout"]}")`);
     process.exit(1);
   }
 }
@@ -746,6 +759,8 @@ async function worker() {
         downloadMedia: values["download-media"],
         sharedAssetsDir,
         waitMs: values.wait ? parseInt(values.wait, 10) : undefined,
+        maxTimeout: values["settle-timeout"] ? parseInt(values["settle-timeout"], 10) : undefined,
+        waitForText: values["wait-for-text"],
       });
 
       if (meta.errors) {
