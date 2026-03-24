@@ -505,17 +505,33 @@ if (values["auth-flow"] && !extensionBridge) {
   }
 }
 
-// Run exploration flow if provided (skipped in extension mode)
-if (values.explore && !extensionBridge) {
+// Run exploration flow if provided
+if (values.explore) {
   const { runAuthFlow } = await import("../lib/auth.js");
-  const explorePage = await context.newPage();
-  await explorePage.setViewportSize(viewport);
-
   const exploreTarget = targets[0].url;
-  await explorePage.goto(exploreTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await explorePage.waitForLoadState("networkidle").catch(() => {});
+  let explorePage;
+  let exploreContext;
 
-  const success = await runAuthFlow(resolve(values.explore), explorePage, context, {
+  if (extensionBridge) {
+    const { createExtensionPage } = await import("../lib/extension-page.js");
+    explorePage = await createExtensionPage(extensionBridge, { viewport });
+    await explorePage.goto(exploreTarget);
+    await explorePage.waitForLoadState().catch(() => {});
+    // Thin context adapter for extension mode
+    exploreContext = {
+      async cookies(url) { return explorePage.context().cookies(url); },
+      async addCookies() { log("  (skipping addCookies in extension mode)"); },
+      waitForEvent() { return Promise.reject(new Error("waitForEvent not supported in extension mode")); },
+    };
+  } else {
+    explorePage = await context.newPage();
+    await explorePage.setViewportSize(viewport);
+    await explorePage.goto(exploreTarget, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await explorePage.waitForLoadState("networkidle").catch(() => {});
+    exploreContext = context;
+  }
+
+  const success = await runAuthFlow(resolve(values.explore), explorePage, exploreContext, {
     outDir,
     types,
   });
@@ -525,7 +541,7 @@ if (values.explore && !extensionBridge) {
   } else {
     log("Exploration flow did not complete.");
   }
-  if (values["session-video"] && explorePage.video()) {
+  if (!extensionBridge && values["session-video"] && explorePage.video()) {
     const exploreVideoPath = await explorePage.video().path();
     await explorePage.close();
     try { await (await import("node:fs/promises")).unlink(exploreVideoPath); } catch { /* video may not exist */ }
