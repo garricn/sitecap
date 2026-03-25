@@ -281,6 +281,111 @@ Examples:
   process.exit(0);
 }
 
+// Handle inventory subcommand
+if (process.argv[2] === "inventory") {
+  const args = process.argv.slice(3);
+  const inventoryUrl = args.find((a) => a.startsWith("https://") || a.startsWith("http://"));
+  const useExtension = args.includes("--extension");
+  const useLaunch = args.includes("--launch");
+  const portIdx = args.indexOf("--extension-port");
+  const extPort = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 9333;
+  const outIdx = args.indexOf("--output");
+  const outIdx2 = args.indexOf("-o");
+  const outFile = (outIdx !== -1 ? args[outIdx + 1] : null) || (outIdx2 !== -1 ? args[outIdx2 + 1] : null);
+  const yamlIdx = args.indexOf("--yaml");
+  const yamlFile = yamlIdx !== -1 ? args[yamlIdx + 1] : null;
+  const depthIdx = args.indexOf("--max-depth");
+  const maxDepth = depthIdx !== -1 ? parseInt(args[depthIdx + 1], 10) : 2;
+  const pagesIdx = args.indexOf("--max-pages");
+  const maxPages = pagesIdx !== -1 ? parseInt(args[pagesIdx + 1], 10) : 100;
+  const stIdx = args.indexOf("--settle-timeout");
+  const settleTimeout = stIdx !== -1 ? parseInt(args[stIdx + 1], 10) : undefined;
+  const wftIdx = args.indexOf("--wait-for-text");
+  const waitForText = wftIdx !== -1 ? args[wftIdx + 1] : undefined;
+  const minIdx = args.indexOf("--min-elements");
+  const minElements = minIdx !== -1 ? parseInt(args[minIdx + 1], 10) : 3;
+
+  if (args.includes("--help") || args.includes("-h") || !inventoryUrl) {
+    console.log(`sitecap inventory — recursively discover all interactive content in a SPA
+
+Usage:
+  sitecap inventory <url> --extension [options]
+  sitecap inventory <url> --launch [options]
+
+Options:
+  --extension              Use running Chrome (authenticated)
+  --launch                 Auto-launch headless Chrome
+  --extension-port <port>  WebSocket port (default: 9333)
+  --max-depth <n>          Max recursion depth (default: 2)
+  --max-pages <n>          Max pages to visit (default: 100)
+  --settle-timeout <ms>    Wait for SPA to render (default: 10000)
+  --wait-for-text <text>   Wait for text before analyzing
+  --min-elements <n>       Minimum elements for a pattern (default: 3)
+  -o, --output <file>      Write inventory JSON to file (default: stdout)
+  --yaml <file>            Also generate explore YAML
+  -h, --help               Show this help
+
+Examples:
+  sitecap inventory https://app.example.com/dashboard --extension
+  sitecap inventory https://app.example.com --extension --max-depth 3 -o inventory.json --yaml explore.yaml
+`);
+    process.exit(0);
+  }
+
+  if (!useExtension && !useLaunch) {
+    console.error("Error: sitecap inventory requires --extension or --launch");
+    process.exit(1);
+  }
+
+  const { buildInventory, generateInventoryYAML } = await import("../lib/inventory.js");
+
+  let page;
+  let cleanup;
+
+  if (useExtension) {
+    const { createExtensionBridge } = await import("../lib/extension.js");
+    const { createExtensionPage } = await import("../lib/extension-page.js");
+    console.error("Waiting for sitecap extension...");
+    const bridge = await createExtensionBridge({ port: extPort, log: (...a) => console.error(...a) });
+    page = await createExtensionPage(bridge, {});
+    cleanup = async () => { await page.close().catch(() => {}); await bridge.close(); };
+  } else {
+    const browser = await chromium.launch({ headless: true });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    page = await ctx.newPage();
+    cleanup = async () => { await browser.close(); };
+  }
+
+  console.error(`Inventorying ${inventoryUrl} (max-depth: ${maxDepth}, max-pages: ${maxPages})...`);
+  const inventory = await buildInventory(page, inventoryUrl, {
+    maxDepth,
+    maxPages,
+    minElements,
+    settleTimeout,
+    waitForText,
+    log: (...a) => console.error(...a),
+  });
+
+  console.error(`\nDone: ${inventory.summary.totalPages} pages, ${inventory.summary.totalPatterns} patterns, ~${inventory.summary.estimatedCaptures} captures`);
+
+  const json = JSON.stringify(inventory, null, 2);
+  if (outFile) {
+    await writeFile(resolve(outFile), json);
+    console.error(`Inventory written to ${outFile}`);
+  } else {
+    process.stdout.write(json + "\n");
+  }
+
+  if (yamlFile) {
+    const yaml = generateInventoryYAML(inventory);
+    await writeFile(resolve(yamlFile), yaml);
+    console.error(`Explore YAML written to ${yamlFile}`);
+  }
+
+  await cleanup();
+  process.exit(0);
+}
+
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
