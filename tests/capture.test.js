@@ -102,6 +102,26 @@ describe("capture", () => {
       expect(meta.timestamp).toBeDefined();
       expect(meta.captures).toBeDefined();
     });
+
+    it("clips screenshot to element when screenshotLocator is provided", async () => {
+      await page.goto(`${baseUrl}/`);
+      const outDir = join(TEST_DIR, "element-clip");
+      await capturePage(page, outDir, {
+        types: ["screenshot"],
+        screenshotLocator: page.locator("h1"),
+      });
+      expect(existsSync(join(outDir, "screenshot.png"))).toBe(true);
+      const data = await readFile(join(outDir, "screenshot.png"));
+      // Valid PNG
+      expect(data[0]).toBe(0x89);
+      expect(data[1]).toBe(0x50);
+      // Read PNG dimensions from IHDR chunk (bytes 16-23)
+      const width = data.readUInt32BE(16);
+      const height = data.readUInt32BE(20);
+      // Element screenshot should be much smaller than full page
+      expect(height).toBeLessThan(200);
+      expect(width).toBeLessThan(1300);
+    });
   });
 
   describe("navigateAndCapture", () => {

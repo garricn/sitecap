@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { chromium } from "playwright";
-import { writeFile, rm, mkdir } from "node:fs/promises";
+import { writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { runAuthFlow, buildSectionTree } from "../lib/auth.js";
@@ -342,6 +342,37 @@ sections:
 
       // Should still capture successfully with post-settle delay
       expect(existsSync(join(outDir, "item-0"))).toBe(true);
+    });
+
+    it("clips screenshots to element bounding box with clip: element", async () => {
+      const outDir = join(TEST_DIR, "sections-clip");
+      await mkdir(outDir, { recursive: true });
+
+      const flowPath = join(TEST_DIR, "sections-clip.yaml");
+      await writeFile(flowPath, `
+name: clip-test
+sections:
+  - name: item
+    url: ${baseUrl}/sections-test
+    selector: ".item"
+    clip: element
+    settle-timeout: 5000
+`);
+
+      await page.goto("about:blank");
+      const result = await runAuthFlow(flowPath, page, context, {
+        outDir,
+        types: ["screenshot"],
+      });
+      expect(result).toBe(true);
+
+      expect(existsSync(join(outDir, "item-0"))).toBe(true);
+      const data = await readFile(join(outDir, "item-0/screenshot.png"));
+      // Valid PNG
+      expect(data[0]).toBe(0x89);
+      // Element screenshot should be smaller than full page (720px viewport)
+      const height = data.readUInt32BE(20);
+      expect(height).toBeLessThan(200);
     });
   });
 });
