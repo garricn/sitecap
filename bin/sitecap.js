@@ -189,6 +189,7 @@ if (process.argv[2] === "discover") {
   const settleTimeout = stIdx !== -1 ? parseInt(args[stIdx + 1], 10) : undefined;
   const wftIdx = args.indexOf("--wait-for-text");
   const waitForText = wftIdx !== -1 ? args[wftIdx + 1] : undefined;
+  const useSections = args.includes("--sections");
 
   if (args.includes("--help") || args.includes("-h") || !discoverUrl) {
     console.log(`sitecap discover — analyze a page and generate explore YAML
@@ -205,13 +206,14 @@ Options:
   --wait-for-text <text>   Wait for text before analyzing
   --wait <ms>              Extra delay before analyzing
   --min-elements <n>       Minimum elements for a pattern (default: 3)
+  --sections               Output flat dot-path sections format (default: nested foreach)
   -o, --output <file>      Write YAML to file (default: stdout)
   -h, --help               Show this help
 
 Examples:
   sitecap discover https://app.example.com/dashboard --extension
   sitecap discover https://example.com --launch --min-elements 5
-  sitecap discover https://app.example.com --extension --wait-for-text "Funnel Steps" -o explore.yaml
+  sitecap discover https://app.example.com --extension --sections -o explore.yaml
 `);
     process.exit(0);
   }
@@ -221,7 +223,7 @@ Examples:
     process.exit(1);
   }
 
-  const { discoverPatterns, generateExploreYAML } = await import("../lib/discover.js");
+  const { discoverPatterns, generateExploreYAML, generateSectionsYAML } = await import("../lib/discover.js");
 
   let page;
   let cleanup;
@@ -268,7 +270,9 @@ Examples:
     }
   }
 
-  const yaml = generateExploreYAML(patterns, { url: discoverUrl, waitMs: 2000 });
+  const yaml = useSections
+    ? generateSectionsYAML(patterns, { url: discoverUrl, waitMs: 2000 })
+    : generateExploreYAML(patterns, { url: discoverUrl, waitMs: 2000 });
 
   if (outFile) {
     await writeFile(resolve(outFile), yaml);
@@ -304,6 +308,7 @@ if (process.argv[2] === "inventory") {
   const waitForText = wftIdx !== -1 ? args[wftIdx + 1] : undefined;
   const minIdx = args.indexOf("--min-elements");
   const minElements = minIdx !== -1 ? parseInt(args[minIdx + 1], 10) : 3;
+  const useSections = args.includes("--sections");
 
   if (args.includes("--help") || args.includes("-h") || !inventoryUrl) {
     console.log(`sitecap inventory — recursively discover all interactive content in a SPA
@@ -323,11 +328,13 @@ Options:
   --min-elements <n>       Minimum elements for a pattern (default: 3)
   -o, --output <file>      Write inventory JSON to file (default: stdout)
   --yaml <file>            Also generate explore YAML
+  --sections               Use flat dot-path sections format for --yaml output
   -h, --help               Show this help
 
 Examples:
   sitecap inventory https://app.example.com/dashboard --extension
   sitecap inventory https://app.example.com --extension --max-depth 3 -o inventory.json --yaml explore.yaml
+  sitecap inventory https://app.example.com --extension --yaml explore.yaml --sections
 `);
     process.exit(0);
   }
@@ -337,7 +344,7 @@ Examples:
     process.exit(1);
   }
 
-  const { buildInventory, generateInventoryYAML } = await import("../lib/inventory.js");
+  const { buildInventory, generateInventoryYAML, generateInventorySectionsYAML } = await import("../lib/inventory.js");
 
   let page;
   let cleanup;
@@ -377,7 +384,9 @@ Examples:
   }
 
   if (yamlFile) {
-    const yaml = generateInventoryYAML(inventory);
+    const yaml = useSections
+      ? generateInventorySectionsYAML(inventory)
+      : generateInventoryYAML(inventory);
     await writeFile(resolve(yamlFile), yaml);
     console.error(`Explore YAML written to ${yamlFile}`);
   }

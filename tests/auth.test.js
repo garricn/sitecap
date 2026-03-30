@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 import { writeFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { runAuthFlow } from "../lib/auth.js";
+import { runAuthFlow, buildSectionTree } from "../lib/auth.js";
 import { startTestServer } from "./helpers/server.js";
 
 const TEST_DIR = "/tmp/sitecap-test-flow";
@@ -195,6 +195,99 @@ steps:
       const testCookie = cookies.find((c) => c.name === "test_cookie");
       expect(testCookie).toBeDefined();
       expect(testCookie.value).toBe("test_value");
+    });
+  });
+
+  describe("buildSectionTree", () => {
+    it("groups flat sections into tree by dot-path names", () => {
+      const sections = [
+        { name: "workflow", selector: ".workflow" },
+        { name: "workflow.node", selector: ".node" },
+        { name: "workflow.node.config", selector: ".config" },
+        { name: "funnel", selector: ".funnel" },
+        { name: "funnel.step", selector: ".step" },
+      ];
+
+      const roots = buildSectionTree(sections);
+      expect(roots).toHaveLength(2);
+      expect(roots[0].name).toBe("workflow");
+      expect(roots[0].children).toHaveLength(1);
+      expect(roots[0].children[0].name).toBe("workflow.node");
+      expect(roots[0].children[0].children).toHaveLength(1);
+      expect(roots[0].children[0].children[0].name).toBe("workflow.node.config");
+      expect(roots[1].name).toBe("funnel");
+      expect(roots[1].children).toHaveLength(1);
+      expect(roots[1].children[0].name).toBe("funnel.step");
+    });
+
+    it("handles single root with no children", () => {
+      const roots = buildSectionTree([{ name: "items", selector: ".item" }]);
+      expect(roots).toHaveLength(1);
+      expect(roots[0].children).toHaveLength(0);
+    });
+
+    it("handles multiple roots", () => {
+      const roots = buildSectionTree([
+        { name: "a", selector: ".a" },
+        { name: "b", selector: ".b" },
+        { name: "c", selector: ".c" },
+      ]);
+      expect(roots).toHaveLength(3);
+    });
+  });
+
+  describe("sections executor", () => {
+    it("executes flat sections YAML and captures to nested slug dirs", async () => {
+      const outDir = join(TEST_DIR, "sections-out");
+      await mkdir(outDir, { recursive: true });
+
+      const flowPath = join(TEST_DIR, "sections-flow.yaml");
+      await writeFile(flowPath, `
+name: sections-test
+sections:
+  - name: item
+    url: ${baseUrl}/sections-test
+    selector: ".item"
+    wait: 500
+`);
+
+      await page.goto(`${baseUrl}/sections-test`);
+      const result = await runAuthFlow(flowPath, page, context, {
+        outDir,
+        types: ["screenshot"],
+      });
+      expect(result).toBe(true);
+
+      // Should have created item-0/, item-1/, item-2/ directories
+      expect(existsSync(join(outDir, "item-0"))).toBe(true);
+      expect(existsSync(join(outDir, "item-1"))).toBe(true);
+      expect(existsSync(join(outDir, "item-2"))).toBe(true);
+    });
+
+    it("supports capture: false to skip capturing at a level", async () => {
+      const outDir = join(TEST_DIR, "sections-nocap");
+      await mkdir(outDir, { recursive: true });
+
+      const flowPath = join(TEST_DIR, "sections-nocap.yaml");
+      await writeFile(flowPath, `
+name: nocap-test
+sections:
+  - name: nav
+    url: ${baseUrl}/sections-test
+    selector: ".item"
+    wait: 500
+    capture: false
+`);
+
+      await page.goto(`${baseUrl}/sections-test`);
+      const result = await runAuthFlow(flowPath, page, context, {
+        outDir,
+        types: ["screenshot"],
+      });
+      expect(result).toBe(true);
+
+      // Should NOT have created any capture directories
+      expect(existsSync(join(outDir, "nav-0"))).toBe(false);
     });
   });
 });
