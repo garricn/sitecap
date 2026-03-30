@@ -185,6 +185,26 @@ export async function startTestServer() {
 </div>
 <div id="detail"></div>
 </body></html>`);
+    } else if (req.url === "/sections-slow") {
+      // Page that renders items after a delay, requiring settle to find them
+      res.end(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Slow SPA</title></head>
+<body>
+<h1>Loading...</h1>
+<div class="items"></div>
+<script>
+setTimeout(() => {
+  document.querySelector('h1').textContent = 'Dashboard Ready';
+  const container = document.querySelector('.items');
+  for (let i = 0; i < 3; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'item';
+    btn.textContent = 'Item ' + i;
+    container.appendChild(btn);
+  }
+}, 300);
+</script>
+</body></html>`);
     } else if (req.url === "/drupal") {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="generator" content="Drupal 10"><title>Drupal</title></head>

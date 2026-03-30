@@ -289,5 +289,59 @@ sections:
       // Should NOT have created any capture directories
       expect(existsSync(join(outDir, "nav-0"))).toBe(false);
     });
+
+    it("uses wait-for-text and settle-timeout to wait for slow SPA content", async () => {
+      const outDir = join(TEST_DIR, "sections-slow");
+      await mkdir(outDir, { recursive: true });
+
+      const flowPath = join(TEST_DIR, "sections-slow.yaml");
+      await writeFile(flowPath, `
+name: slow-spa-test
+sections:
+  - name: item
+    url: ${baseUrl}/sections-slow
+    selector: ".item"
+    wait-for-text: "Dashboard Ready"
+    settle-timeout: 5000
+`);
+
+      await page.goto("about:blank");
+      const result = await runAuthFlow(flowPath, page, context, {
+        outDir,
+        types: ["screenshot"],
+      });
+      expect(result).toBe(true);
+
+      // Items are injected after 300ms delay — settle should find them
+      expect(existsSync(join(outDir, "item-0"))).toBe(true);
+      expect(existsSync(join(outDir, "item-1"))).toBe(true);
+      expect(existsSync(join(outDir, "item-2"))).toBe(true);
+    });
+
+    it("applies post-settle wait delay after settle completes", async () => {
+      const outDir = join(TEST_DIR, "sections-postwait");
+      await mkdir(outDir, { recursive: true });
+
+      const flowPath = join(TEST_DIR, "sections-postwait.yaml");
+      await writeFile(flowPath, `
+name: postwait-test
+sections:
+  - name: item
+    url: ${baseUrl}/sections-test
+    selector: ".item"
+    settle-timeout: 5000
+    wait: 200
+`);
+
+      await page.goto("about:blank");
+      const result = await runAuthFlow(flowPath, page, context, {
+        outDir,
+        types: ["screenshot"],
+      });
+      expect(result).toBe(true);
+
+      // Should still capture successfully with post-settle delay
+      expect(existsSync(join(outDir, "item-0"))).toBe(true);
+    });
   });
 });
