@@ -173,6 +173,18 @@ export async function startTestServer() {
       } else {
         res.end(JSON.stringify({ success: true, total: 1, results: [{ id: 1, name: "TestElement", description: "Mock element" }] }));
       }
+    } else if (req.url === "/sections-test") {
+      res.end(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Sections Test</title></head>
+<body>
+<h1>Items</h1>
+<div class="items">
+  <button class="item" onclick="document.getElementById('detail').textContent='Detail 0'">Item 0</button>
+  <button class="item" onclick="document.getElementById('detail').textContent='Detail 1'">Item 1</button>
+  <button class="item" onclick="document.getElementById('detail').textContent='Detail 2'">Item 2</button>
+</div>
+<div id="detail"></div>
+</body></html>`);
     } else if (req.url === "/drupal") {
       res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="generator" content="Drupal 10"><title>Drupal</title></head>
